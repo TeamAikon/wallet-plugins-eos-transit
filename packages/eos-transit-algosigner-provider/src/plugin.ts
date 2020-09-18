@@ -120,7 +120,7 @@ export function algosignerWalletProvider({
         if(!accountName){
           throw new Error("Provided account name to be logged in to. AlgoSigner does not support account selection.");
         }
-
+ 
         let networks: AlgoNetworkType[];
         if(_network)
           networks = [_network];
