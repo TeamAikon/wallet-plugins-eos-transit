@@ -118,7 +118,7 @@ export function algosignerWalletProvider({
       return new Promise<WalletAuth>(async (resolve, reject) => {
 
         if(!accountName){
-          throw new Error("Provided account name to be logged in to. AlgoSigner does not support account selection.");
+          throw new Error("AlgoSigner does not support a way for the user to select an account to login. Provide an accountName when calling login().");
         }
  
         let networks: AlgoNetworkType[];
@@ -126,19 +126,21 @@ export function algosignerWalletProvider({
           networks = [_network];
         else
           networks = [AlgoNetworkType.MainNet, AlgoNetworkType.TestNet, AlgoNetworkType.BetaNet];
-
+        
         for(let net of networks){
-          let acc = await AlgoSigner.accounts({ledger: net});
-          for(let account of acc){
-            if(account.address === accountName){
-              const loggedInAccount = processAccount(account);
-              _loggedInAccount = loggedInAccount;
-              return resolve({permission: authorization, accountName: loggedInAccount.accountName, publicKey: loggedInAccount.publicKey});
-            }
+          let accounts = await AlgoSigner.accounts({ledger: net});
+
+          let matchingAccout = accounts.find(account => account.address === accountName)
+
+          if(matchingAccout){
+            const loggedInAccount = processAccount(matchingAccout);
+            _loggedInAccount = loggedInAccount;
+            return resolve({permission: authorization, accountName: loggedInAccount.accountName, publicKey: loggedInAccount.publicKey});
           }
         }
 
-        throw new Error(`Cannot find account with provided address '${accountName}'.`)
+        throw new Error(`Cannot find account with provided address '${accountName}'.`);
+        
       });
     }
 
