@@ -1,0 +1,36 @@
+{
+	"name": "eos-transit-algosigner-provider",
+	"version": "1.0.0",
+	"description": "Algosigner Wallet provider",
+	"license": "MIT",
+	"main": "lib/index.js",
+	"module": "lib/index.js",
+	"types": "lib",
+	"scripts": {
+		"echo": "echo \"================== eos-transit-algosigner-provider ===================\"",
+		"installpkg": "yarn echo && npm install",
+		"clean": "rm -rf lib && rm -rf umd",
+		"prebuild": "yarn clean",
+		"build": "../../node_modules/typescript/bin/tsc",
+		"build-production": "yarn build && TS_NODE_PROJECT=\"tsconfig.webpack.json\" webpack",
+		"watch": "../../node_modules/typescript/bin/tsc -w",
+		"test": "",
+		"lint": "../../node_modules/.bin/tslint -c ../../tslint.json -p ./tsconfig.json"
+	},
+	"dependencies": {
+		"@msgpack/msgpack": "^2.0.0",
+		"hi-base32": "^0.5.0"
+	},
+	"devDependencies": {
+		"@types/node": "^14.11.1",
+		"webpack": "^4.25.1",
+		"webpack-cli": "^3.1.2"
+	},
+	"prettier": {
+		"singleQuote": true,
+		"printWidth": 80,
+		"tabWidth": 2,
+		"useTabs": false,
+		"bracketSpacing": true
+	}
+}

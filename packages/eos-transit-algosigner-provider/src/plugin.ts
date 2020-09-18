@@ -1,0 +1,177 @@
+import {toPublicKeyFromAddress, decodeUint8Array, encodeToUint8Array, processAccountForDiscovery, processAccount} from "./helper"
+import { AlgoNetworkType, SignatureProviderArgs, WalletAuth, NetworkConfig, AlgorandRawTransactionStruct, AlgoAccount, WalletProvider, SignatureProvider, PushTransactionArgs, ALGOSIGNER_DEFAULT_PERMISSION} from "./types"
+import * as msgpack from "@msgpack/msgpack";
+import { Buffer } from 'buffer';
+
+
+let _network: AlgoNetworkType = AlgoNetworkType.MainNet;
+
+let _loggedInAccount: WalletAuth;
+
+
+export function makeSignatureProvider(): SignatureProvider {
+
+  return {
+    /** Returns the list of public keys of all the accounts in current network. */
+    async getAvailableKeys(): Promise<string[]> {
+
+
+      if(_loggedInAccount)
+        return [_loggedInAccount.publicKey];
+
+      
+      return null as any;
+    },
+
+    /** Signs a transaction using the private keys in AlgoSigner wallet. */
+    async sign({serializedTransaction}: SignatureProviderArgs): Promise<PushTransactionArgs>  {
+      
+      const txn = decodeUint8Array(serializedTransaction) as any;
+
+      const res = await AlgoSigner.sign(txn);
+
+      // This is how algosigner decodes base64 string
+
+      const t = atob(res.blob).split("").map(c => c.charCodeAt(0))
+
+      let arr = new Uint8Array(t);
+
+      const signedTransaction: AlgorandRawTransactionStruct = msgpack.decode(arr) as AlgorandRawTransactionStruct;
+
+      const respone : PushTransactionArgs =  {
+        signatures: [Buffer.from(signedTransaction.sig).toString("hex")], 
+        serializedTransaction: encodeToUint8Array({txn: signedTransaction.txn}),
+      };
+
+      return respone;
+    }
+  };
+}
+
+export interface AlgoSignerWalletProviderOptions {
+  id: string;
+  name: string;
+  shortName: string;
+  description?: string;
+  errorTimeout?: number;
+  network?: AlgoNetworkType
+}
+
+export function algosignerWalletProvider({
+  id = 'algosigner',
+  name = 'Algorand AlgoSigner Web Wallet',
+  shortName = 'AlgoSigner',
+  description = 'Use AlgoSigner Web Wallet to sign your Algorand transactions',
+  errorTimeout,
+  network
+}: AlgoSignerWalletProviderOptions) {
+
+  // if network is provided in the constructor, docover should return accounts of this specific network.
+  // otherwise discover returns accounts for all networks;
+
+  let discoverNetworkFor = network;
+  if(network)
+    _network = network;
+
+  return function makeWalletProvider(network: NetworkConfig): WalletProvider {
+
+
+    /** Verifies that the AlgoSigner plugin exists and password has been entered.  */
+    function connect(appName: string) {
+      return new Promise(async (resolve, reject) => {
+
+        AlgoSigner.connect().then(val => {
+          if(val){
+            resolve(true);
+          }
+          else{
+            reject("AlgoSigner: Connect Error");
+          }
+        })
+
+        setTimeout(() => {
+          reject(`Cannot connect to "${shortName}" wallet provider`);
+        }, errorTimeout || 2500);
+      });
+    }
+
+    /** AlgoSigner doesn't store connection state hence no action required. */
+    function disconnect(): Promise<any> {
+      return Promise.resolve(true);
+    }
+
+
+    /** Returns all accounts in a wallet. If network is provided in the constructor then it only returns accounts for that network.  */
+    async function discover(/* discoveryOptions: DiscoveryOptions */) {
+
+      let networks: AlgoNetworkType[];
+
+      if(discoverNetworkFor !== undefined)
+        networks = [_network];
+      else
+        networks = [AlgoNetworkType.MainNet, AlgoNetworkType.TestNet, AlgoNetworkType.BetaNet];
+
+      let walletAccounts: AlgoAccount[] = [];
+
+      let index = 0;
+      for(let net of networks){
+        let acc = await AlgoSigner.accounts({ledger: AlgoNetworkType.TestNet});
+        walletAccounts = [...walletAccounts, ...processAccountForDiscovery({accounts: acc, index, network: net})];
+        index += acc.length;
+      }
+
+      return walletAccounts;
+    }
+
+    // Authentication
+
+    function login(accountName?: string, authorization: string = ALGOSIGNER_DEFAULT_PERMISSION): Promise<WalletAuth> {
+      return new Promise<WalletAuth>(async (resolve, reject) => {
+        
+        const walletAccounts = await AlgoSigner.accounts({ledger: _network});
+        const account = processAccount(walletAccounts[0]);
+        _loggedInAccount = account;
+        resolve({permission: authorization, accountName: account.accountName, publicKey: account.publicKey})
+        
+
+        setTimeout(() => {
+          reject(`Cannot login to "${shortName}" wallet provider`);
+        }, errorTimeout || 2500);
+      });
+    }
+
+
+    /** AlgoSigner doesn't store login state hence no action required. */
+    function logout(accountName?: string): Promise<boolean> {
+      return Promise.resolve(true);
+    }
+
+
+    /** Algosigner doesnt expose an API to sign arbitrary string. */
+    function signArbitrary(data: string, userMessage: string): Promise<string> {
+			return new Promise((resolve, reject) => {
+				reject('not implemented');
+			});
+		}
+
+		const walletProvider: WalletProvider = {
+			id,
+			meta: {
+				name,
+				shortName,
+				description
+			},
+			signatureProvider: makeSignatureProvider(),
+			connect,
+			discover,
+			disconnect,
+			login,
+			logout,
+      signArbitrary,
+		};
+
+    return walletProvider;
+  };
+}
+
+export default algosignerWalletProvider;

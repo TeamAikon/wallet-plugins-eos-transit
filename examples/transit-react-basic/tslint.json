@@ -1,5 +1,11 @@
 {
     "extends": ["tslint:latest", "tslint-react", "tslint-config-prettier"],
+    "parserOptions": {
+      "ecmaFeatures": {
+          "experimentalObjectRestSpread": true
+      },
+      "ecmaVersion": 2018
+  },
     "rules": {
       "ban": false,
       "class-name": true,
