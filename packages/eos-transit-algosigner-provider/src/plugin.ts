@@ -1,12 +1,18 @@
-import {toPublicKeyFromAddress, decodeUint8Array, encodeToUint8Array, processAccountForDiscovery, processAccount} from "./helper"
+import {toPublicKeyFromAddress, decodeUint8Array, encodeToUint8Array, processAccountForDiscovery, processAccount, discoverAccounts} from "./helper"
 import { AlgoNetworkType, SignatureProviderArgs, WalletAuth, NetworkConfig, AlgorandRawTransactionStruct, AlgoAccount, WalletProvider, SignatureProvider, PushTransactionArgs, ALGOSIGNER_DEFAULT_PERMISSION} from "./types"
 import * as msgpack from "@msgpack/msgpack";
 import { Buffer } from 'buffer';
 
 
 let _network: AlgoNetworkType = AlgoNetworkType.MainNet;
-
+let _providedNetwork: AlgoNetworkType | undefined;
 let _loggedInAccount: WalletAuth;
+
+
+
+async function _discover(){
+  return await discoverAccounts(_providedNetwork)
+}
 
 
 export function makeSignatureProvider(): SignatureProvider {
@@ -19,8 +25,8 @@ export function makeSignatureProvider(): SignatureProvider {
       if(_loggedInAccount)
         return [_loggedInAccount.publicKey];
 
+      return await (await _discover()).map(account => account.key.key);
       
-      return null as any;
     },
 
     /** Signs a transaction using the private keys in AlgoSigner wallet. */
@@ -69,7 +75,7 @@ export function algosignerWalletProvider({
   // if network is provided in the constructor, docover should return accounts of this specific network.
   // otherwise discover returns accounts for all networks;
 
-  let discoverNetworkFor = network;
+  _providedNetwork = network;
   if(network)
     _network = network;
 
@@ -103,40 +109,36 @@ export function algosignerWalletProvider({
 
     /** Returns all accounts in a wallet. If network is provided in the constructor then it only returns accounts for that network.  */
     async function discover(/* discoveryOptions: DiscoveryOptions */) {
-
-      let networks: AlgoNetworkType[];
-
-      if(discoverNetworkFor !== undefined)
-        networks = [_network];
-      else
-        networks = [AlgoNetworkType.MainNet, AlgoNetworkType.TestNet, AlgoNetworkType.BetaNet];
-
-      let walletAccounts: AlgoAccount[] = [];
-
-      let index = 0;
-      for(let net of networks){
-        let acc = await AlgoSigner.accounts({ledger: AlgoNetworkType.TestNet});
-        walletAccounts = [...walletAccounts, ...processAccountForDiscovery({accounts: acc, index, network: net})];
-        index += acc.length;
-      }
-
-      return walletAccounts;
+      return await _discover();
     }
 
     // Authentication
 
     function login(accountName?: string, authorization: string = ALGOSIGNER_DEFAULT_PERMISSION): Promise<WalletAuth> {
       return new Promise<WalletAuth>(async (resolve, reject) => {
-        
-        const walletAccounts = await AlgoSigner.accounts({ledger: _network});
-        const account = processAccount(walletAccounts[0]);
-        _loggedInAccount = account;
-        resolve({permission: authorization, accountName: account.accountName, publicKey: account.publicKey})
-        
 
-        setTimeout(() => {
-          reject(`Cannot login to "${shortName}" wallet provider`);
-        }, errorTimeout || 2500);
+        if(!accountName){
+          throw new Error("Provided account name to be logged in to. AlgoSigner does not support account selection.");
+        }
+
+        let networks: AlgoNetworkType[];
+        if(_network)
+          networks = [_network];
+        else
+          networks = [AlgoNetworkType.MainNet, AlgoNetworkType.TestNet, AlgoNetworkType.BetaNet];
+
+        for(let net of networks){
+          let acc = await AlgoSigner.accounts({ledger: net});
+          for(let account of acc){
+            if(account.address === accountName){
+              const loggedInAccount = processAccount(account);
+              _loggedInAccount = loggedInAccount;
+              return resolve({permission: authorization, accountName: loggedInAccount.accountName, publicKey: loggedInAccount.publicKey});
+            }
+          }
+        }
+
+        throw new Error(`Cannot find account with provided address '${accountName}'.`)
       });
     }
 

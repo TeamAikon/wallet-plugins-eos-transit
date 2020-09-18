@@ -71,3 +71,24 @@ export function processAccount(account: AlgoSignerAccountInfo): WalletAuth{
         }
     ));
   }
+
+
+  export async function discoverAccounts(network?: AlgoNetworkType){
+    let networks: AlgoNetworkType[];
+
+    if(network !== undefined)
+      networks = [network];
+    else
+      networks = [AlgoNetworkType.MainNet, AlgoNetworkType.TestNet, AlgoNetworkType.BetaNet];
+
+    let walletAccounts: AlgoAccount[] = [];
+
+    let index = 0;
+    for(let net of networks){
+      let acc = await AlgoSigner.accounts({ledger: AlgoNetworkType.TestNet});
+      walletAccounts = [...walletAccounts, ...processAccountForDiscovery({accounts: acc, index, network: net})];
+      index += acc.length;
+    }
+
+    return walletAccounts;
+  }
