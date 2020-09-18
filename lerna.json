@@ -1,0 +1,11 @@
+{
+	"packages": [ "packages/*", "examples/transit-react-basic" ],
+	"version": "independent",
+	"npmClient": "yarn",
+	"command": {
+		"publish": {
+			"message": "chore(release): publish",
+			"ignoreChanges": [ "*.md" ]
+		}
+	}
+}
