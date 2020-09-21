@@ -1,5 +1,5 @@
-import {toPublicKeyFromAddress, decodeUint8Array, encodeToUint8Array, processAccountForDiscovery, processAccount, discoverAccounts} from "./helper"
-import { AlgoNetworkType, SignatureProviderArgs, WalletAuth, NetworkConfig, AlgorandRawTransactionStruct, AlgoAccount, WalletProvider, SignatureProvider, PushTransactionArgs, ALGOSIGNER_DEFAULT_PERMISSION} from "./types"
+import { decodeUint8Array, encodeToUint8Array, discoverAccounts, getWalletAuthForAccount, FIELDS_TO_REMOVE_FROM_TXN} from "./helper"
+import { AlgoNetworkType, SignatureProviderArgs, WalletAuth, NetworkConfig, AlgorandRawTransactionStruct, DiscoverResponse, WalletProvider, SignatureProvider, PushTransactionArgs, ALGOSIGNER_DEFAULT_PERMISSION, DiscoveryOptions, AlgoSignerWalletProviderOptions, TxnObject} from "./types"
 import * as msgpack from "@msgpack/msgpack";
 import { Buffer } from 'buffer';
 
@@ -32,7 +32,11 @@ export function makeSignatureProvider(): SignatureProvider {
     /** Signs a transaction using the private keys in AlgoSigner wallet. */
     async sign({serializedTransaction}: SignatureProviderArgs): Promise<PushTransactionArgs>  {
       
-      const txn = decodeUint8Array(serializedTransaction) as any;
+      const txn = decodeUint8Array<TxnObject>(serializedTransaction);
+
+
+      // temporarily remove extra field that are not supported but AlgoSigner yet.
+      FIELDS_TO_REMOVE_FROM_TXN.map(field => delete txn[field]);
 
       const res = await AlgoSigner.sign(txn);
 
@@ -54,26 +58,20 @@ export function makeSignatureProvider(): SignatureProvider {
   };
 }
 
-export interface AlgoSignerWalletProviderOptions {
-  id: string;
-  name: string;
-  shortName: string;
-  description?: string;
-  errorTimeout?: number;
-  network?: AlgoNetworkType
-}
 
-export function algosignerWalletProvider({
-  id = 'algosigner',
-  name = 'Algorand AlgoSigner Web Wallet',
-  shortName = 'AlgoSigner',
-  description = 'Use AlgoSigner Web Wallet to sign your Algorand transactions',
-  errorTimeout,
-  network
-}: AlgoSignerWalletProviderOptions) {
+export function algosignerWalletProvider(props: AlgoSignerWalletProviderOptions) {
 
   // if network is provided in the constructor, docover should return accounts of this specific network.
   // otherwise discover returns accounts for all networks;
+
+  const {
+    id = 'algosigner',
+    name = 'Algorand AlgoSigner Web Wallet',
+    shortName = 'AlgoSigner',
+    description = 'Use AlgoSigner Web Wallet to sign your Algorand transactions',
+    errorTimeout,
+    network
+  } = props;
 
   _providedNetwork = network;
   if(network)
@@ -83,7 +81,7 @@ export function algosignerWalletProvider({
 
 
     /** Verifies that the AlgoSigner plugin exists and password has been entered.  */
-    function connect(appName: string) {
+    function connect(appName: string): Promise<boolean> {
       return new Promise(async (resolve, reject) => {
 
         AlgoSigner.connect().then(val => {
@@ -102,13 +100,15 @@ export function algosignerWalletProvider({
     }
 
     /** AlgoSigner doesn't store connection state hence no action required. */
-    function disconnect(): Promise<any> {
+    function disconnect(): Promise<boolean> {
       return Promise.resolve(true);
     }
 
 
     /** Returns all accounts in a wallet. If network is provided in the constructor then it only returns accounts for that network.  */
-    async function discover(/* discoveryOptions: DiscoveryOptions */) {
+    async function discover(_discoveryOptions: DiscoveryOptions): Promise<DiscoverResponse[]> {
+      // _discoveryOptions: Remove underscroe from _discoveryOptions when it is actually used. 
+      // it added for now to get away with un-used variable warning.
       return await _discover();
     }
 
@@ -133,7 +133,7 @@ export function algosignerWalletProvider({
           let matchingAccout = accounts.find(account => account.address === accountName)
 
           if(matchingAccout){
-            const loggedInAccount = processAccount(matchingAccout);
+            const loggedInAccount = getWalletAuthForAccount(matchingAccout);
             _loggedInAccount = loggedInAccount;
             return resolve({permission: authorization, accountName: loggedInAccount.accountName, publicKey: loggedInAccount.publicKey});
           }

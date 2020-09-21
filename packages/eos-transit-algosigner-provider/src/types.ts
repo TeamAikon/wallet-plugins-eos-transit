@@ -1,13 +1,11 @@
-
-
 export const ALGOSIGNER_DEFAULT_PERMISSION = "active";
-
 
 export interface AlgoSignerType{
     connect(): Promise<boolean>;
     accounts(props: ConnectProps): Promise<AlgoSignerAccountInfo[]>;
     sign(TxnObject: TxnObject): Promise<AlgoSignerSignSuccessResponse>;
-    send(props: SignProps): Promise<AlgoSignerTransactionSuccessResponse>
+    send(props: SignProps): Promise<AlgoSignerTransactionSuccessResponse>;
+
 }
 
 
@@ -41,16 +39,15 @@ export interface AlgoSignerTransactionSuccessResponse {
 
 type AccountPublicKey = string;
 
-export type AlgoAccount = {
+
+/** stringified account info - account, authorization, network */
+export type DiscoverResponse = {
     key: {
         index: number,
         key: AccountPublicKey
     },
     note: string
 }
-
-
-
 
 
 export interface TxnObject{
@@ -80,8 +77,6 @@ export interface AlgoSignerAccount{
     permission: string,
     publicKey: string
 }
-
-
 
 
 export interface SignatureProviderArgs{
@@ -206,11 +201,11 @@ export interface WalletProvider {
     id: string;
     meta?: WalletProviderMetadata;
     signatureProvider: SignatureProvider;
-    connect(appName: string): Promise<any>;
-    discover(discoveryOptions: DiscoveryOptions): Promise<any>;
-    disconnect(): Promise<any>;
+    connect(appName: string): Promise<boolean>;
+    discover(discoveryOptions: DiscoveryOptions): Promise<DiscoverResponse[]>;
+    disconnect(): Promise<boolean>;
     login(accountName?: string, authorization?: string, index?: number, key?: string): Promise<WalletAuth>;
-    logout(accountName?: string): Promise<any>;
+    logout(accountName?: string): Promise<boolean>;
     signArbitrary(data: string, userMessage: string): Promise<string>;
 }
 
@@ -232,11 +227,6 @@ export interface PushTransactionArgs {
 }
 
 
-
-
-
-
-
 export interface NetworkConfig {
     name?: string;
     protocol?: string;
@@ -244,3 +234,13 @@ export interface NetworkConfig {
     port?: number;
     chainId: string;
 }
+
+export interface AlgoSignerWalletProviderOptions {
+    id: string;
+    name: string;
+    shortName: string;
+    description?: string;
+    errorTimeout?: number;
+    network?: AlgoNetworkType
+  }
+  

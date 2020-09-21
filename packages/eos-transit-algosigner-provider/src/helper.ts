@@ -1,10 +1,12 @@
 
 import * as base32 from "hi-base32";
 import * as msgpack from "@msgpack/msgpack";
-import { AlgoAccount, AlgoNetworkType, AlgoSignerAccountInfo, ALGOSIGNER_DEFAULT_PERMISSION, WalletAuth } from "./types";
+import { DiscoverResponse, AlgoNetworkType, AlgoSignerAccountInfo, ALGOSIGNER_DEFAULT_PERMISSION, WalletAuth } from "./types";
 
 const ALGORAND_ADDRESS_BYTES_ONLY_LENGTH = 36;
 const ALGORAND_CHECKSUM_BYTE_LENGTH = 4;
+
+export const FIELDS_TO_REMOVE_FROM_TXN = ["flatfee", "tag", "name"];
 
 
 export function toPublicKeyFromAddress(address: string): string {
@@ -36,8 +38,8 @@ export function isAString(value: any) {
 
 
 
-export function decodeUint8Array(array: Uint8Array){
-    return msgpack.decode(array);
+export function decodeUint8Array<T>(array: Uint8Array): T{
+    return msgpack.decode(array) as T;
 }
 
 export function encodeToUint8Array(obj: any){
@@ -47,7 +49,7 @@ export function encodeToUint8Array(obj: any){
 
 
 
-export function processAccount(account: AlgoSignerAccountInfo): WalletAuth{
+export function getWalletAuthForAccount(account: AlgoSignerAccountInfo): WalletAuth{
   
     return   {
       accountName: account.address,
@@ -57,19 +59,23 @@ export function processAccount(account: AlgoSignerAccountInfo): WalletAuth{
     
   }
   
-  export function processAccountForDiscovery({accounts, network, index}:{accounts: AlgoSignerAccountInfo[], network: AlgoNetworkType, index: number}): AlgoAccount[]{
-    return accounts.map(account => (
+  export function processAccountForDiscovery({accounts, network, index}:{accounts: AlgoSignerAccountInfo[], network: AlgoNetworkType, index: number}): DiscoverResponse[]{
+    return accounts.map(account => {
+      const {accountName, permission, publicKey} = getWalletAuthForAccount(account);
+      return (
         {
             key: {
                 index: ++index,
-                key: toPublicKeyFromAddress(account.address),
+                key: publicKey,
             },
             note: JSON.stringify({
                 network,
-                account: account.address
+                permission,
+                accountName
             })
         }
-    ));
+    )
+  });
   }
 
 
@@ -81,7 +87,7 @@ export function processAccount(account: AlgoSignerAccountInfo): WalletAuth{
     else
       networks = [AlgoNetworkType.MainNet, AlgoNetworkType.TestNet, AlgoNetworkType.BetaNet];
 
-    let walletAccounts: AlgoAccount[] = [];
+    let walletAccounts: DiscoverResponse[] = [];
 
     let index = 0;
     for(let net of networks){

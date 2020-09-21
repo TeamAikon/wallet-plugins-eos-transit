@@ -1,8 +1,8 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from 'react';
 
-import WAL, { WalletProvider } from "eos-transit";
-import { AuthContext } from "./context";
-import { Redirect } from "react-router-dom";
+import WAL, { WalletProvider } from 'eos-transit';
+import { AuthContext } from './context';
+import { Redirect } from 'react-router-dom';
 
 interface Props {}
 
@@ -18,7 +18,7 @@ export const LoginPage: React.FC<Props> = React.memo(() => {
   const login = async (wallet: WalletProvider) => {
     WAL.accessContext.initWallet(wallet);
     try {
-      const res = await wallet.connect("AlgoSignerApp");
+      const res = await wallet.connect('Example Algo Signer App');
       if (res) {
         const lres = await wallet.login();
         if (lres) {
