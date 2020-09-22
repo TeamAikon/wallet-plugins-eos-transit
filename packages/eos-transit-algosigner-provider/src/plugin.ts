@@ -34,8 +34,7 @@ export function makeSignatureProvider(): SignatureProvider {
       
       const txn = decodeUint8Array<TxnObject>(serializedTransaction);
 
-
-      // temporarily remove extra field that are not supported but AlgoSigner yet.
+      // Remove fields not needed for chain transaction (AlgoSigner throws if any are present)
       FIELDS_TO_REMOVE_FROM_TXN.map(field => delete txn[field]);
 
       const res = await AlgoSigner.sign(txn);
