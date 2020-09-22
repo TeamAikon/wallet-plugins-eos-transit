@@ -3,7 +3,9 @@ import {
   encodeToUint8Array,
   discoverAccounts,
   getWalletAuthForAccount,
-  FIELDS_TO_REMOVE_FROM_TXN
+  FIELDS_TO_REMOVE_FROM_TXN,
+  ALL_ALGORAND_NETWORKS,
+  ALGOSIGNER_DEFAULT_PERMISSION,
 } from './helper';
 import {
   AlgoNetworkType,
@@ -15,10 +17,9 @@ import {
   WalletProvider,
   SignatureProvider,
   PushTransactionArgs,
-  ALGOSIGNER_DEFAULT_PERMISSION,
   DiscoveryOptions,
   AlgoSignerWalletProviderOptions,
-  TxnObject
+  TxnObject,
 } from './types';
 import * as msgpack from '@msgpack/msgpack';
 import { Buffer } from 'buffer';
@@ -32,9 +33,8 @@ export function makeSignatureProvider(): SignatureProvider {
     /** Returns the list of public keys of all the accounts in current network. */
     async getAvailableKeys(): Promise<string[]> {
       if (_loggedInAccount) return [_loggedInAccount.publicKey];
-
-      return (await discoverAccounts(_providedNetwork)).map(
-        account => account.key.key
+      return (await discoverAccounts(_providedNetwork)).keys.map(
+        account => account.key // AlgoSigner has only one key per account
       );
     },
 
@@ -85,7 +85,7 @@ export function algosignerWalletProvider(
     description = 'Use AlgoSigner Web Wallet to sign your Algorand transactions',
     errorTimeout,
     network
-  } = args;
+  } = args || {};
 
   _providedNetwork = network;
   if (network) _network = network;
@@ -116,7 +116,7 @@ export function algosignerWalletProvider(
     /** Returns all accounts in a wallet. If network is provided in the constructor then it only returns accounts for that network.  */
     async function discover(
       discoveryOptions: DiscoveryOptions
-    ): Promise<DiscoverResponse[]> {
+    ): Promise<DiscoverResponse> {
       // _discoveryOptions: Remove underscroe from _discoveryOptions when it is actually used.
       // it added for now to get away with un-used variable warning.
       return await discoverAccounts(_providedNetwork);
@@ -138,11 +138,7 @@ export function algosignerWalletProvider(
         let networks: AlgoNetworkType[];
         if (_network) networks = [_network];
         else
-          networks = [
-            AlgoNetworkType.MainNet,
-            AlgoNetworkType.TestNet,
-            AlgoNetworkType.BetaNet
-          ];
+          networks = ALL_ALGORAND_NETWORKS
 
         for (let net of networks) {
           let accounts = await AlgoSigner.accounts({ ledger: net });
