@@ -1,7 +1,7 @@
 {
 	"name": "eos-transit-algosigner-provider",
-	"version": "1.0.0",
-	"description": "Algosigner Wallet provider",
+	"version": "0.9.0",
+	"description": "Algosigner wallet provider",
 	"license": "MIT",
 	"main": "lib/index.js",
 	"module": "lib/index.js",
