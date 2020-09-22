@@ -1,4 +1,4 @@
-# eos-transit-stub-provider
+# eos-transit-algosigner-provider
 
 ## Introduction
 
@@ -8,11 +8,10 @@ Website: https://www.eostransit.com/
 EOS Transit, NPM: https://www.npmjs.com/package/eos-transit  
 EOS Transit, Github: https://github.com/eosnewyork/eos-transit/tree/master/packages/eos-transit
 
-
 ## Links To This Package
 
-NPM: https://www.npmjs.com/package/eos-transit-stub-provider  
-Github: https://github.com/eosnewyork/eos-transit/tree/master/packages/eos-transit-stub-provider
+NPM: https://www.npmjs.com/package/eos-transit-algosigner-provider 
+Github: https://github.com/TeamAikon/wallet-plugins-eos-transit/tree/master/packages/eos-transit-algosigner-provider
 
 ## Implementation Details
 

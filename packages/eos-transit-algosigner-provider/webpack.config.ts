@@ -22,10 +22,10 @@ const config: Configuration = {
     extensions: ['.tsx', '.ts', '.js']
   },
   output: {
-    filename: 'eos-transit-stub-provider.min.js',
+    filename: 'eos-transit-algosigner-provider.min.js',
     path: path.resolve(__dirname, 'umd'),
     libraryTarget: 'umd',
-    library: ['WAL', 'providers', 'stub'],
+    library: ['WAL', 'providers', 'algosigner'],
     libraryExport: 'default'
   },
   plugins: [
