@@ -1,5 +1,4 @@
 import { initDefaultAccessContext } from 'eos-transit';
-// import anchorlink from 'eos-transit-anchorlink-provider';
 
 import algoSigner, {AlgoNetworkType} from "eos-transit-algosigner-provider"
 
@@ -16,6 +15,5 @@ const walContext = initDefaultAccessContext({
 	// walletProviders: [ scatter() ]
 	walletProviders: [ 
 		algoSigner({id: "algosigner", name: "AlgoSigner", shortName: "AlgoSigner", network: AlgoNetworkType.TestNet})
-		//anchorlink(Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),{}) 
 	]
 });
