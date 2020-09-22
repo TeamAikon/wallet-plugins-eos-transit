@@ -1,8 +1,5 @@
-import algoSigner from "./plugin";
-
-
+import algoSigner from './plugin';
 
 export default algoSigner;
 
-
-export {AlgoNetworkType} from "./types"
+export { AlgoNetworkType } from './types';
