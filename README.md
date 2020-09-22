@@ -24,7 +24,7 @@ This is a monorepo that is managed with [`lerna`](https://github.com/lerna/lerna
 
         $ yarn install
    
-    **Note** that before `eos-transit-algosigner-provider` and `eos-transit-stub-provider` are published, they are managed by `lerna` along with packages themselves. That means, before running the examples, `lerna` should wire up all the dependencies and instead of running `yarn install` manually from this folder, the following commands should be run from the project root:
+    **Note** that before `eos-transit-algosigner-provider` (and other plugins) are published, they are managed by `lerna` along with packages themselves. That means, before running the examples, `lerna` should wire up all the dependencies and instead of running `yarn install` manually from this folder, the following commands should be run from the project root:
 
 3.  Bootstrap the dependencies with
 
