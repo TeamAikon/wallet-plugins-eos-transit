@@ -1,5 +1,3 @@
-export const ALGOSIGNER_DEFAULT_PERMISSION = 'active';
-
 export interface AlgoSignerType {
   connect(): Promise<boolean>;
   accounts(props: ConnectProps): Promise<AlgoSignerAccountInfo[]>;
@@ -37,11 +35,11 @@ type AccountPublicKey = string;
 
 /** stringified account info - account, authorization, network */
 export type DiscoverResponse = {
-  key: {
+  keys: {
     index: number;
     key: AccountPublicKey;
-  };
-  note: string;
+    note: string;
+  }[];
 };
 
 export interface TxnObject {
@@ -195,7 +193,7 @@ export interface WalletProvider {
   meta?: WalletProviderMetadata;
   signatureProvider: SignatureProvider;
   connect(appName: string): Promise<boolean>;
-  discover(discoveryOptions: DiscoveryOptions): Promise<DiscoverResponse[]>;
+  discover(discoveryOptions: DiscoveryOptions): Promise<DiscoverResponse>;
   disconnect(): Promise<boolean>;
   login(
     accountName?: string,

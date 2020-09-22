@@ -1,17 +1,22 @@
 import * as base32 from 'hi-base32';
 import * as msgpack from '@msgpack/msgpack';
 import {
-  DiscoverResponse,
   AlgoNetworkType,
   AlgoSignerAccountInfo,
-  ALGOSIGNER_DEFAULT_PERMISSION,
+  DiscoverResponse,
   WalletAuth
 } from './types';
 
+// Constants
+export const FIELDS_TO_REMOVE_FROM_TXN = ['flatfee', 'tag', 'name'];
+export const ALGOSIGNER_DEFAULT_PERMISSION = 'active';
+export const ALL_ALGORAND_NETWORKS: AlgoNetworkType[] = [
+    AlgoNetworkType.MainNet,
+    AlgoNetworkType.TestNet,
+    // AlgoNetworkType.BetaNet  // disabled until AlgoSigner supports this network
+  ];
 const ALGORAND_ADDRESS_BYTES_ONLY_LENGTH = 36;
 const ALGORAND_CHECKSUM_BYTE_LENGTH = 4;
-
-export const FIELDS_TO_REMOVE_FROM_TXN = ['flatfee', 'tag', 'name'];
 
 export function toPublicKeyFromAddress(address: string): string {
   const ADDRESS_MALFORMED_ERROR = 'address seems to be malformed';
@@ -70,47 +75,40 @@ export function processAccountForDiscovery({
   accounts: AlgoSignerAccountInfo[];
   network: AlgoNetworkType;
   index: number;
-}): DiscoverResponse[] {
-  return accounts.map(account => {
+}): DiscoverResponse {
+  const keys = accounts.map(account => {
     const { accountName, permission, publicKey } = getWalletAuthForAccount(
       account
     );
     return {
-      key: {
-        index: ++index,
-        key: publicKey
-      },
+      index: ++index,
+      key: publicKey,
       note: JSON.stringify({
         network,
         permission,
         accountName
       })
     };
-  });
+  })
+  return { keys };
 }
 
-export async function discoverAccounts(network?: AlgoNetworkType) {
+export async function discoverAccounts(network?: AlgoNetworkType): Promise<DiscoverResponse> {
   let networks: AlgoNetworkType[];
 
-  if (network !== undefined) networks = [network];
-  else
-    networks = [
-      AlgoNetworkType.MainNet,
-      AlgoNetworkType.TestNet,
-      AlgoNetworkType.BetaNet
-    ];
+  // use provided network or, if not provided, use all networks
+  networks = (network) ? [network] : ALL_ALGORAND_NETWORKS;
 
-  let walletAccounts: DiscoverResponse[] = [];
+  let walletAccounts: DiscoverResponse = {
+    keys: []
+  };
 
   let index = 0;
-  for (let net of networks) {
-    let acc = await AlgoSigner.accounts({ ledger: AlgoNetworkType.TestNet });
-    walletAccounts = [
-      ...walletAccounts,
-      ...processAccountForDiscovery({ accounts: acc, index, network: net })
-    ];
+  for (let network of networks) {
+    let acc = await AlgoSigner.accounts({ ledger: network });
+    const accountsOnNetwork = processAccountForDiscovery({ accounts: acc, index, network })
     index += acc.length;
-  }
-
+    walletAccounts.keys.push(...accountsOnNetwork.keys)
+  }  
   return walletAccounts;
 }
