@@ -1,5 +1,5 @@
 import * as base32 from 'hi-base32';
-import * as msgpack from '@msgpack/msgpack';
+import * as msgpack from '@msgpack/msgpack/dist';
 import {
   AlgoNetworkType,
   AlgoSignerAccountInfo,

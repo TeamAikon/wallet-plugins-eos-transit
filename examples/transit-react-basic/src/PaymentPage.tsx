@@ -7,7 +7,7 @@ import {
   AlgorandChainActionType,
 } from "@open-rights-exchange/chainjs/dist/chains/algorand_1/models";
 
-import * as msgpack from "@msgpack/msgpack";
+import * as msgpack from "@msgpack/msgpack/dist";
 
 import { AuthContext } from "./context";
 

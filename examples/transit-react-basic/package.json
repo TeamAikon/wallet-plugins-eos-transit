@@ -12,7 +12,7 @@
 	},
 	"dependencies": {
 		"eos-transit-algosigner-provider": "1.0.0",
-		"@msgpack/msgpack": "^2.0.0",
+		"@msgpack/msgpack": "^2.5.1",
 		"@open-rights-exchange/chainjs": "0.24.6",
 		"@babel/runtime": "^7.1.2",
 		"emotion": "^9.2.10",

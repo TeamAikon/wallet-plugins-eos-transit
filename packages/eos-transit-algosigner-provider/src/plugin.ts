@@ -21,7 +21,7 @@ import {
   AlgoSignerWalletProviderOptions,
   TxnObject,
 } from './types';
-import * as msgpack from '@msgpack/msgpack';
+import * as msgpack from '@msgpack/msgpack/dist';
 import { Buffer } from 'buffer';
 
 let _network: AlgoNetworkType = AlgoNetworkType.MainNet;
