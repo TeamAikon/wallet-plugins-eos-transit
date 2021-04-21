@@ -6,7 +6,8 @@ import {
   AlgorandActionPaymentParams,
   AlgorandChainActionType,
 } from "@open-rights-exchange/chainjs/dist/chains/algorand_1/models";
-
+// NOTE: @msgpack/msgpack/dist is required due to packaging error in msgpack that causes build errors (for mjs files) in other projects 
+// See: https://github.com/msgpack/msgpack-javascript/issues/169
 import * as msgpack from "@msgpack/msgpack/dist";
 
 import { AuthContext } from "./context";
