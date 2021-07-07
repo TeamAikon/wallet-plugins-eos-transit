@@ -1,5 +1,5 @@
-import algoSigner from './plugin';
+import web3Provider from './plugin';
 
-export default algoSigner;
+export default web3Provider;
 
-export { AlgoNetworkType } from './types';
+export { EthereumNetworkType } from './types';
