@@ -102,7 +102,6 @@ export interface SignatureProvider {
   /** Sign a transaction */
   sign: (args: SignatureProviderArgs) => Promise<PushTransactionArgs>;
 }
-
 export interface DiscoveryOptions {
   pathIndexList: number[];
   keyModifierFunc?: KeyModifierCallback;
@@ -172,6 +171,3 @@ export interface NetworkConfig {
   port?: number;
   chainId: string;
 }
-
-
-
