@@ -205,7 +205,13 @@ export function web3WalletProvider(
       meta: {
         name,
         shortName,
-        description
+        description,
+        isWalletInterface: true,
+        walletMetadata: {
+          name: '',
+          shortName: '',
+          description: '',
+        },
       },
       signatureProvider: makeSignatureProvider(),
       connect,
