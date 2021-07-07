@@ -155,13 +155,13 @@ export function web3WalletProvider(
      */
     async function discover(discoveryOptions: DiscoveryOptions): Promise<DiscoverResponse> {
       return new Promise(async (resolve, reject) => {
-        reject('Web3: Discover is not supported')
-      })
+        reject('Web3: Discover is not supported');
+      });
     }
 
 
     function disconnect(): Promise<boolean> {
-      console.log('web3WalletProvider::disconnect')
+      console.log('web3WalletProvider::disconnect');
       return Promise.resolve(true);
     }
     
@@ -169,17 +169,17 @@ export function web3WalletProvider(
     function login(accountName: string, authorization: string = WEB3_DEFAULT_PERMISSION) : Promise<WalletAuth> {
       return new Promise<WalletAuth>(async (resolve, reject) => {
         try {
-          const accounts = await provider.send('eth_requestAccounts')
-          const account = accounts[0]
+          const accounts = await provider.send('eth_requestAccounts');
+          const account = accounts[0];
           const output = {
             permission: 'active',
             accountName: account,
           }
-          return resolve(output)  
+          return resolve(output);
         } catch (error) {
-          reject(error)
+          reject(error);
         }
-      })
+      });
     }
 
     function logout(accountName?: string): Promise<boolean> {
@@ -191,13 +191,13 @@ export function web3WalletProvider(
     function signArbitrary(data: string, userMessage: string): Promise<any> {
       return new Promise(async (resolve, reject) => {
         try {
-          const signedTransaction = await signer.signMessage(data)
-          const splitSignature = ethers.utils.splitSignature(signedTransaction)
+          const signedTransaction = await signer.signMessage(data);
+          const splitSignature = ethers.utils.splitSignature(signedTransaction);
           resolve(signedTransaction)
         } catch (err) {
-          reject(err) 
+          reject(err);
         }
-      })
+      });
     }
 
     const walletProvider: WalletProvider = {
