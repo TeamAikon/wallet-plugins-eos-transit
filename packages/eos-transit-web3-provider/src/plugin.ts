@@ -34,7 +34,6 @@ export function makeSignatureProvider(): SignatureProvider {
       return new Promise(async (resolve, reject) => {
         try {
           const decodedTransaction: any = decode(serializedTransaction);
-          console.log('decodedTransaction', decodedTransaction);
   
           // if the decoded transaction contains a contract, execute specified function in the contract
           if ( decodedTransaction.contract ) {
