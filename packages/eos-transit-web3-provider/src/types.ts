@@ -48,8 +48,8 @@ declare global {
 }
 
 export enum EthereumNetworkType {
-  eth_main = 'eth_main',
-  eth_ropsten = 'eth_ropsten',
+  EthMain = 'eth_main',
+  EthRopsten = 'eth_ropsten',
 }
 
 export interface WalletAuth {
