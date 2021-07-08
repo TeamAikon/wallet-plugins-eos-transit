@@ -93,6 +93,7 @@ export function web3WalletProvider(
 
   let networkConfig: any;
   let selectedAccount: string;
+  let currentNetwork: any;
 
   return function makeWalletProvider(network: NetworkConfig): WalletProvider {
     networkConfig = network;
@@ -122,6 +123,7 @@ export function web3WalletProvider(
 
           // setup network change listener
           provider.on('network', (network: any, oldNetwork: any) => {
+            currentNetwork = network;
             const currentNetworkId = parseInt(network?.chainId);
             if ( specifiedNetworkId !== currentNetworkId ) {
               throw new Error(`Invalid Network, Please select the specified network in the Wallet. Specified Network: ${JSON.stringify(networkConfig)} | Selected Network: ${JSON.stringify(network)}`);
@@ -134,6 +136,7 @@ export function web3WalletProvider(
           // TODO: Throw error on account change
           window.ethereum.on('accountsChanged', (accounts: any) => {
             const account = accounts.length > 0 ? accounts[0] : null;
+            selectedAccount = account;
             console.log('accountsChanged - account, selectedAccount', account, selectedAccount);
           })
 
