@@ -208,9 +208,9 @@ export function web3WalletProvider(
         description,
         isWalletInterface: true,
         walletMetadata: {
-          name: '',
-          shortName: '',
-          description: '',
+          name: 'unspecified',
+          shortName: 'unspecified',
+          description: 'unspecified',
         },
       },
       signatureProvider: makeSignatureProvider(),
