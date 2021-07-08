@@ -22,12 +22,14 @@ declare const window: any;
 
 export function makeSignatureProvider(): SignatureProvider {
   return {
+    /** This doesn't exist in web3 provider */
     async getAvailableKeys(): Promise<string[]> {
       return new Promise((resolve, reject) => {
         reject('not implemented');
       });
     },
 
+    /** Signs the provided transaction */
     async sign({
       serializedTransaction
     }: SignatureProviderArgs): Promise<PushTransactionArgs> {
@@ -161,13 +163,12 @@ export function web3WalletProvider(
       });
     }
 
-
+    /** disconnect method is not present in web3 provider (programmatically), User can directly disconnect from the extension */
     function disconnect(): Promise<boolean> {
-      console.log('web3WalletProvider::disconnect');
       return Promise.resolve(true);
     }
     
-
+    /** login is not required for web3 provider, connecting to wallet can be considered as login */
     function login(accountName: string, authorization: string = WEB3_DEFAULT_PERMISSION) : Promise<WalletAuth> {
       return new Promise<WalletAuth>(async (resolve, reject) => {
         try {
@@ -184,12 +185,14 @@ export function web3WalletProvider(
       });
     }
 
+    /** Logout functionality is not present in web3 provider and cannot be implemented */
     function logout(accountName?: string): Promise<boolean> {
       return new Promise((resolve, reject) => {
         resolve(true);
       });
     }
 
+    /** sign arbitrary string using web3 provider */
     function signArbitrary(data: string, userMessage: string): Promise<any> {
       return new Promise(async (resolve, reject) => {
         try {
@@ -202,6 +205,7 @@ export function web3WalletProvider(
       });
     }
 
+    /** return the wallet provider */
     const walletProvider: WalletProvider = {
       id,
       meta: {
