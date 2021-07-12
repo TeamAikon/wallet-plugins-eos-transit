@@ -27,10 +27,10 @@ export function assertIsConnected(reject: any): void {
 
 export function makeSignatureProvider(): SignatureProvider {
   return {
-    /** This doesn't exist in web3 provider */
+    /** Web3 provider doesn't support discovering keys from the wallet. */
     async getAvailableKeys(): Promise<string[]> {
       return new Promise((resolve, reject) => {
-        reject('not implemented');
+        reject('Web3: getAvailableKeys is not supported');
       });
     },
 
@@ -223,7 +223,7 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
       });
     }
 
-    /** disconnect method is not present in web3 provider (programmatically), User can directly disconnect from the extension */
+    /** disconnect method is not supported by web3 provider (programmatically), User can directly disconnect from the wallet/extension */
     function disconnect(): Promise<boolean> {
       return Promise.resolve(true);
     }
