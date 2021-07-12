@@ -70,7 +70,6 @@ export function makeSignatureProvider(): SignatureProvider {
           if (decodedTransaction?.contract) {
             const { contract: decodedContract } = decodedTransaction;
 
-            const address = await signer.getAddress();
             const contract = new ethers.Contract(
               decodedTransaction.to,
               decodedContract.abi,
@@ -161,7 +160,14 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
               ))
             );
           selectedNetwork = await provider.getNetwork(); // get the currently selected network
-          // TODO: If selectedNetwork.chainId !== networkConfig.chainId - THEN prompt used to select correct network - or select it automatically 
+
+          // propmt the user to select the correct network
+          await window?.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: networkConfig.chainId }],
+          });
+          selectedNetwork = await provider.getNetwork(); // get the currently selected network
+
           // confirm current selected network matches requested network
           assertIsDesiredNetwork(networkConfig);
           signer = provider.getSigner(); // get and set the signer
@@ -189,18 +195,27 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
     }
 
     /** reject if requiredNetwork is not already selected in the wallet */
-    function assertIsDesiredNetwork(
+    async function assertIsDesiredNetwork(
       // requiredNetwork: ethers.providers.Network,
       requiredNetwork: Omit<ethers.providers.Network, 'chainId'> & {chainId: any},
       reject?: any
-    ): void {
+    ): Promise<void> {
       // TODO: selectedNetwork?.chainId type is number, requiredNetwork?.chainId type is string - fix it
       if (selectedNetwork?.chainId !== parseInt(requiredNetwork?.chainId)) {
-        const errMsg = `Desired network not selected in wallet: Please select the it using the Wallet. Specified Network: ${JSON.stringify(
-          requiredNetwork
-        )}`;
-        if(reject) reject(errMsg);
-        throw new Error(errMsg)
+        try {
+          // propmt the user to select the correct network
+          await window?.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: networkConfig.chainId }],
+          });
+          selectedNetwork = await provider.getNetwork(); // get the currently selected network          
+        } catch (err) {
+          const errMsg = `Desired network not selected in wallet: Please select the it using the Wallet. Specified Network: ${JSON.stringify(
+            requiredNetwork
+          )}`;
+          if(reject) reject(errMsg);
+          throw new Error(errMsg)  
+        }
       }
     }
 
