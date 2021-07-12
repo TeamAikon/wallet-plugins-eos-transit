@@ -53,10 +53,18 @@ export function makeSignatureProvider(): SignatureProvider {
               decodedContract.abi,
               provider
             );
-            const connected = contract.connect(signer);
-            const transaction = await connected.functions[
+            const contractConnectedWithSigner = contract.connect(signer);
+
+            // Web3 wallet expects the value to be a valid BigNumber not a string
+            // Either convert the value to BN here to send BN as value in the transaction
+            const contractParameters = [ ...decodedContract.parameters ];
+            contractParameters[1] = ethers.utils.parseEther(contractParameters[1].toString());
+            console.log('contractParameters', contractParameters)
+
+            const transaction = await contractConnectedWithSigner.functions[
               decodedContract.method
-            ](...decodedContract.parameters);
+            ](...contractParameters);
+            console.log('transaction', transaction)
 
             resolve({
               signatures: transaction,
