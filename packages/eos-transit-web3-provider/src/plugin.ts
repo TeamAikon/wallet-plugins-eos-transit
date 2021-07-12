@@ -299,7 +299,6 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
         assertIsConnected(reject);
         try {
           const signedTransaction = await signer.signMessage(data);
-          const splitSignature = ethers.utils.splitSignature(signedTransaction);
           resolve(signedTransaction);
         } catch (err) {
           reject(err);
