@@ -82,17 +82,19 @@ export function makeSignatureProvider(): SignatureProvider {
             // Either convert the value to BN here to send BN as value in the transaction
             const contractParameters = [ ...decodedContract.parameters ];
             contractParameters[1] = ethers.utils.parseEther(contractParameters[1].toString());
-            console.log('contractParameters', contractParameters)
 
             const transaction = await contractConnectedWithSigner.functions[
               decodedContract.method
             ](...contractParameters);
-            console.log('transaction', transaction)
 
+            const rawTransaction = getRawTransaction(transaction);
+            const { v, r, s } = transaction;
+            const signature = v && r && s ? JSON.stringify({ v, r, s }) : null;
             resolve({
-              signatures: transaction,
-              serializedTransaction
+              signatures: signature ? [signature] : [],
+              serializedTransaction: rawTransaction
             });
+
           }
           // if the decoded transaction doesn't contain a contract, call sendTransaction on signer
           else {
