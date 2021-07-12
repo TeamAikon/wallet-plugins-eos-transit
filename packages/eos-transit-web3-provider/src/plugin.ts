@@ -128,7 +128,6 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
               ))
             );
           selectedNetwork = await provider.getNetwork(); // get the currently selected network
-          console.log('currentProviderNetwork:', selectedNetwork);
           // TODO: If selectedNetwork.chainId !== networkConfig.chainId - THEN prompt used to select correct network - or select it automatically 
           // confirm current selected network matches requested network
           assertIsDesiredNetwork(networkConfig)
@@ -158,10 +157,12 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
 
     /** reject if requiredNetwork is not already selected in the wallet */
     function assertIsDesiredNetwork(
-      requiredNetwork: ethers.providers.Network,
+      // requiredNetwork: ethers.providers.Network,
+      requiredNetwork: Omit<ethers.providers.Network, 'chainId'> & {chainId: any},
       reject?: any
     ): void {
-      if (selectedNetwork?.chainId !== requiredNetwork?.chainId) {
+      // TODO: selectedNetwork?.chainId type is number, requiredNetwork?.chainId type is string - fix it
+      if (selectedNetwork?.chainId !== parseInt(requiredNetwork?.chainId)) {
         const errMsg = `Desired network not selected in wallet: Please select the it using the Wallet. Specified Network: ${JSON.stringify(
           requiredNetwork
         )}`;
