@@ -137,7 +137,7 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
           selectedNetwork = await provider.getNetwork(); // get the currently selected network
           // TODO: If selectedNetwork.chainId !== networkConfig.chainId - THEN prompt used to select correct network - or select it automatically 
           // confirm current selected network matches requested network
-          assertIsDesiredNetwork(networkConfig)
+          assertIsDesiredNetwork(networkConfig);
           signer = provider.getSigner(); // get and set the signer
 
           // set the first account as currently selected
@@ -184,7 +184,7 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
       oldNetwork: ethers.providers.Network
     ): void {
       console.log('Selected network:', network);
-      assertIsDesiredNetwork(network)
+      assertIsDesiredNetwork(network);
       selectedNetwork = network;
     }
 
