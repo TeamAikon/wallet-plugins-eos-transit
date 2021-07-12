@@ -1,27 +1,26 @@
-import { ethers, providers, Signer} from 'ethers';
+import { ethers, providers, Signer } from 'ethers';
 import { decode, encode } from '@msgpack/msgpack';
 import {
-  WalletAuth,
-  Web3WalletProviderOptions,
-  WalletProvider,
-  DiscoveryOptions,
   DiscoverResponse,
+  DiscoveryOptions,
+  NetworkConfig,
+  PushTransactionArgs,
   SignatureProvider,
   SignatureProviderArgs,
-  PushTransactionArgs,
-  NetworkConfig,
+  Web3WalletProviderOptions,
+  WalletAuth,
+  WalletProvider,
 } from './types';
-import {
-  WEB3_DEFAULT_PERMISSION,
-} from './helper';
+import { WEB3_DEFAULT_PERMISSION } from './helper';
 
 let provider: providers.Web3Provider;
 let signer: Signer;
+let loggedInAccount: WalletAuth | undefined;
 
 declare const window: any;
 
-export function assertIsConnected(reject: any): void { 
-  if(!provider) {
+export function assertIsConnected(reject: any): void {
+  if (!provider) {
     reject('Not connected. Call connect() before using this function');
   }
 }
@@ -41,57 +40,62 @@ export function makeSignatureProvider(): SignatureProvider {
     }: SignatureProviderArgs): Promise<PushTransactionArgs> {
       return new Promise(async (resolve, reject) => {
         try {
-          assertIsConnected(reject)
+          assertIsConnected(reject);
           const decodedTransaction: any = decode(serializedTransaction);
-  
+
           // if the decoded transaction contains a contract, execute specified function in the contract
-          if ( decodedTransaction?.contract ) {
+          if (decodedTransaction?.contract) {
             const { contract: decodedContract } = decodedTransaction;
 
             const address = await signer.getAddress();
-            const contract = new ethers.Contract(address, decodedContract.abi, provider);
+            const contract = new ethers.Contract(
+              address,
+              decodedContract.abi,
+              provider
+            );
             const connected = contract.connect(signer);
-            const transaction = await connected.functions[decodedContract.method](...decodedContract.parameters);
+            const transaction = await connected.functions[
+              decodedContract.method
+            ](...decodedContract.parameters);
             // let data = await contract.staticCall.transfer(toAddress, amount);
 
             resolve({
               signatures: transaction,
-              serializedTransaction,
+              serializedTransaction
             });
           }
           // if the decoded transaction doesn't contain a contract, call sendTransaction on signer
           else {
-            let finalTransaction = { ...decodedTransaction }
+            let finalTransaction = { ...decodedTransaction };
             // check if decodedTransaction?.value is present and if it's string, Parse it to ether
-            if ( decodedTransaction?.value && typeof decodedTransaction.value === 'string' ) {
+            if (
+              decodedTransaction?.value &&
+              typeof decodedTransaction.value === 'string'
+            ) {
               finalTransaction = {
                 ...decodedTransaction,
-                value: ethers.utils.parseEther(decodedTransaction.value),
-              }
+                value: ethers.utils.parseEther(decodedTransaction.value)
+              };
             }
-            const signedTransactionResult = await signer.sendTransaction(finalTransaction);
-            const {v, r, s, raw} = signedTransactionResult
-            const signature = (v && r && s) ? JSON.stringify({ v, r, s }) : null
+            const signedTransactionResult = await signer.sendTransaction(
+              finalTransaction
+            );
+            const { v, r, s, raw } = signedTransactionResult;
+            const signature = v && r && s ? JSON.stringify({ v, r, s }) : null;
             resolve({
               signatures: signature ? [signature] : [],
-              serializedTransaction: encode(raw),
+              serializedTransaction: encode(raw)  // TODO: Map signedTransactionResult to Transaction tytpe prperties and return here
             });
           }
         } catch (error) {
           reject(error);
         }
-
-      })
-    },
-  }
+      });
+    }
+  };
 }
 
-
-
-export function web3WalletProvider(
-  args: Web3WalletProviderOptions
-) {
-
+export function web3WalletProvider(args: Web3WalletProviderOptions) {
   const {
     id = 'web3',
     name = 'Web3 Web Wallet',
@@ -102,8 +106,8 @@ export function web3WalletProvider(
   } = args || {};
 
   let networkConfig: any;
-  let selectedAccount: string;
-  let currentNetwork: any;
+  let selectedAccount: string | undefined;
+  let selectedNetwork: ethers.providers.Network | undefined;
 
   return function makeWalletProvider(network: NetworkConfig): WalletProvider {
     networkConfig = network;
@@ -115,40 +119,31 @@ export function web3WalletProvider(
         // what Metamask injects as window.ethereum into each page
         try {
           // create a new instance of ethers js using web3 provider
-          await window.ethereum.enable().then(provider = (new ethers.providers.Web3Provider(window.ethereum, 'any')));
-          const network = await provider.getNetwork(); // get the network
-
-          // make sure user is connected to the same network as specified
-          const specifiedNetworkId = parseInt(networkConfig?.chainId);
-          const currentNetworkId = network?.chainId;
-          if ( specifiedNetworkId !== currentNetworkId ) {
-            throw new Error(`Invalid Network, Please select the specified network in the Wallet. Specified Network: ${JSON.stringify(networkConfig)} | Selected Network: ${JSON.stringify(network)}`);
-          }
-
+          await window.ethereum
+            .enable()
+            .then(
+              (provider = new ethers.providers.Web3Provider(
+                window.ethereum,
+                'any'
+              ))
+            );
+          selectedNetwork = await provider.getNetwork(); // get the currently selected network
+          console.log('currentProviderNetwork:', selectedNetwork);
+          // TODO: If selectedNetwork.chainId !== networkConfig.chainId - THEN prompt used to select correct network - or select it automatically 
+          // confirm current selected network matches requested network
+          assertIsDesiredNetwork(networkConfig)
           signer = provider.getSigner(); // get and set the signer
 
-          // get all accounts
-          const accounts = await provider.send('eth_requestAccounts', [] ) || [];
-          selectedAccount = accounts.length > 0 ? accounts[0] : null;
-
+          // set the first account as currently selected
+          selectedAccount = (await login()).accountName
           // setup network change listener
-          provider.on('network', (network: any, oldNetwork: any) => {
-            currentNetwork = network;
-            const currentNetworkId = parseInt(network?.chainId);
-            if ( specifiedNetworkId !== currentNetworkId ) {
-              throw new Error(`Invalid Network, Please select the specified network in the Wallet. Specified Network: ${JSON.stringify(networkConfig)} | Selected Network: ${JSON.stringify(network)}`);
-            }
-          })
-        
+          provider.on('network', changeNetwork);
+
           // setup account change listener
           // https://github.com/ethers-io/ethers.js/issues/1396
           // https://github.com/ethers-io/ethers.js/discussions/1560
           // TODO: Throw error on account change
-          window.ethereum.on('accountsChanged', (accounts: any) => {
-            const account = accounts.length > 0 ? accounts[0] : null;
-            selectedAccount = account;
-            console.log('accountsChanged - account, selectedAccount', account, selectedAccount);
-          })
+          window.ethereum.on('accountsChanged', changeAccount);
 
           if (provider) {
             resolve(true);
@@ -156,19 +151,67 @@ export function web3WalletProvider(
             reject('Web3: Connect error');
           }
         } catch (error) {
-          reject(`Web3: Connect Error: ${error}`);
+          reject(error);
         }
       });
     }
 
+    /** reject if requiredNetwork is not already selected in the wallet */
+    function assertIsDesiredNetwork(
+      requiredNetwork: ethers.providers.Network,
+      reject?: any
+    ): void {
+      if (selectedNetwork?.chainId !== requiredNetwork?.chainId) {
+        const errMsg = `Desired network not selected in wallet: Please select the it using the Wallet. Specified Network: ${JSON.stringify(
+          requiredNetwork
+        )}`;
+        if(reject) reject(errMsg);
+        throw new Error(errMsg)
+      }
+    }
+
+    /** called when wallet user changes network */
+    function changeNetwork(
+      network: ethers.providers.Network,
+      oldNetwork: ethers.providers.Network
+    ): void {
+      console.log('Selected network:', network);
+      assertIsDesiredNetwork(network)
+      selectedNetwork = network;
+    }
+
+    /** called when wallet user changes accounts */
+    function changeAccount(accounts: string[]) {
+      const account = accounts?.length > 0 ? accounts[0] : undefined;
+      selectedAccount = account;
+      console.log(
+        'accountsChanged - accounts, selectedAccount',
+        accounts,
+        selectedAccount
+      );
+    }
 
     /**
-     * This method is currently not supported as web3 wallets doesn't support this functionality
-     * This method should list all the accounts user has in their wallet
+     * This method returns a list of all the accounts reported by the wallet
+     * For web3, it can't get the publicKey from the wallet so we don't return it here
      */
-    async function discover(discoveryOptions: DiscoveryOptions): Promise<DiscoverResponse> {
+    async function discover(
+      discoveryOptions?: DiscoveryOptions
+    ): Promise<DiscoverResponse> {
       return new Promise(async (resolve, reject) => {
-        reject('Web3: Discover is not supported');
+        try {
+          const accounts = await provider.listAccounts();
+          const response = accounts?.map(
+            account =>
+              ({
+                accountName: account,
+                permission: 'active'
+              } as WalletAuth)
+          );
+          resolve(response);
+        } catch (error) {
+          reject(error);
+        }
       });
     }
 
@@ -176,19 +219,34 @@ export function web3WalletProvider(
     function disconnect(): Promise<boolean> {
       return Promise.resolve(true);
     }
-    
+
     /** login is not required for web3 provider, connecting to wallet can be considered as login */
-    function login(accountName: string, authorization: string = WEB3_DEFAULT_PERMISSION) : Promise<WalletAuth> {
+    async function login(
+      accountName?: string,
+      authorization: string = WEB3_DEFAULT_PERMISSION
+    ): Promise<WalletAuth> {
       return new Promise<WalletAuth>(async (resolve, reject) => {
-        assertIsConnected(reject)
+        assertIsConnected(reject);
         try {
-          const accounts = await provider.send('eth_requestAccounts', [] );
-          const account = accounts[0];
-          const output = {
-            permission: 'active',
-            accountName: account,
+          const accounts = await discover();
+          if (accountName) {
+            const account = accounts.find(a => accountName === a.accountName);
+            if (!account) {
+              reject(
+                `Account ${accountName} not found in wallet - can't login with it`
+              );
+            } else {
+              resolve(account);
+            }
           }
-          return resolve(output);
+          if (!accounts || accounts.length === 0) {
+            reject(
+              'No accounts in wallet - please add or connect accounts in the wallet before logging in'
+            );
+          }
+          const firstAccount = accounts[0];
+          loggedInAccount = firstAccount;
+          resolve(firstAccount);
         } catch (error) {
           reject(error);
         }
@@ -198,6 +256,7 @@ export function web3WalletProvider(
     /** Logout functionality is not present in web3 provider and cannot be implemented */
     function logout(accountName?: string): Promise<boolean> {
       return new Promise((resolve, reject) => {
+        loggedInAccount = undefined;
         resolve(true);
       });
     }
@@ -205,11 +264,11 @@ export function web3WalletProvider(
     /** sign arbitrary string using web3 provider */
     function signArbitrary(data: string, userMessage: string): Promise<any> {
       return new Promise(async (resolve, reject) => {
-        assertIsConnected(reject)
+        assertIsConnected(reject);
         try {
           const signedTransaction = await signer.signMessage(data);
           const splitSignature = ethers.utils.splitSignature(signedTransaction);
-          resolve(signedTransaction)
+          resolve(signedTransaction);
         } catch (err) {
           reject(err);
         }
@@ -227,8 +286,8 @@ export function web3WalletProvider(
         walletMetadata: {
           name: 'unspecified',
           shortName: 'unspecified',
-          description: 'unspecified',
-        },
+          description: 'unspecified'
+        }
       },
       signatureProvider: makeSignatureProvider(),
       connect,
@@ -237,12 +296,10 @@ export function web3WalletProvider(
       login,
       logout,
       signArbitrary
-    }
+    };
 
     return walletProvider;
-
-  }
-
+  };
 }
 
 export default web3WalletProvider;
