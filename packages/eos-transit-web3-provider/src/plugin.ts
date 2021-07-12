@@ -49,7 +49,7 @@ export function makeSignatureProvider(): SignatureProvider {
 
             const address = await signer.getAddress();
             const contract = new ethers.Contract(
-              address,
+              decodedTransaction.to,
               decodedContract.abi,
               provider
             );
@@ -57,7 +57,6 @@ export function makeSignatureProvider(): SignatureProvider {
             const transaction = await connected.functions[
               decodedContract.method
             ](...decodedContract.parameters);
-            // let data = await contract.staticCall.transfer(toAddress, amount);
 
             resolve({
               signatures: transaction,
