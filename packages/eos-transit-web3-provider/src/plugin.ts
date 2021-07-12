@@ -25,6 +25,29 @@ export function assertIsConnected(reject: any): void {
   }
 }
 
+/** get the raw transaction from response and remove unnecessary fields */
+function getRawTransaction(transaction: ethers.providers.TransactionResponse) {
+  const rawTransactionObject: ethers.Transaction = {
+    hash: transaction?.hash,
+    to: transaction?.to,
+    from: transaction?.from,
+    nonce: transaction?.nonce,
+    gasLimit: transaction?.gasLimit,
+    gasPrice: transaction?.gasPrice,
+    data: transaction?.data,
+    value: transaction?.value,
+    chainId: transaction?.chainId,
+    r: transaction?.r,
+    s: transaction?.s,
+    v: transaction?.v,
+    type: transaction?.type,
+    accessList: transaction?.accessList,
+    maxPriorityFeePerGas: transaction?.maxPriorityFeePerGas,
+    maxFeePerGas: transaction?.maxFeePerGas,
+  }
+  return encode(rawTransactionObject, { sortKeys: true });
+}
+
 export function makeSignatureProvider(): SignatureProvider {
   return {
     /** Web3 provider doesn't support discovering keys from the wallet. */
@@ -87,11 +110,12 @@ export function makeSignatureProvider(): SignatureProvider {
             const signedTransactionResult = await signer.sendTransaction(
               finalTransaction
             );
-            const { v, r, s, raw } = signedTransactionResult;
+            const rawTransaction = getRawTransaction(signedTransactionResult);
+            const { v, r, s } = signedTransactionResult;
             const signature = v && r && s ? JSON.stringify({ v, r, s }) : null;
             resolve({
               signatures: signature ? [signature] : [],
-              serializedTransaction: encode(raw)  // TODO: Map signedTransactionResult to Transaction tytpe prperties and return here
+              serializedTransaction: rawTransaction
             });
           }
         } catch (error) {
