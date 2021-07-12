@@ -1,5 +1,5 @@
-import { ethers } from 'ethers';
-import { decode } from '@msgpack/msgpack';
+import { ethers, providers, Signer} from 'ethers';
+import { decode, encode } from '@msgpack/msgpack';
 import {
   WalletAuth,
   Web3WalletProviderOptions,
@@ -15,10 +15,16 @@ import {
   WEB3_DEFAULT_PERMISSION,
 } from './helper';
 
-let provider: any;
-let signer: any;
+let provider: providers.Web3Provider;
+let signer: Signer;
 
 declare const window: any;
+
+export function assertIsConnected(reject: any): void { 
+  if(!provider) {
+    reject('Not connected. Call connect() before using this function');
+  }
+}
 
 export function makeSignatureProvider(): SignatureProvider {
   return {
@@ -35,10 +41,11 @@ export function makeSignatureProvider(): SignatureProvider {
     }: SignatureProviderArgs): Promise<PushTransactionArgs> {
       return new Promise(async (resolve, reject) => {
         try {
+          assertIsConnected(reject)
           const decodedTransaction: any = decode(serializedTransaction);
   
           // if the decoded transaction contains a contract, execute specified function in the contract
-          if ( decodedTransaction.contract ) {
+          if ( decodedTransaction?.contract ) {
             const { contract: decodedContract } = decodedTransaction;
 
             const address = await signer.getAddress();
@@ -62,10 +69,12 @@ export function makeSignatureProvider(): SignatureProvider {
                 value: ethers.utils.parseEther(decodedTransaction.value),
               }
             }
-            const sendTransaction = await signer.sendTransaction(finalTransaction);
+            const signedTransactionResult = await signer.sendTransaction(finalTransaction);
+            const {v, r, s, raw} = signedTransactionResult
+            const signature = (v && r && s) ? JSON.stringify({ v, r, s }) : null
             resolve({
-              signatures: sendTransaction,
-              serializedTransaction,
+              signatures: signature ? [signature] : [],
+              serializedTransaction: encode(raw),
             });
           }
         } catch (error) {
@@ -105,13 +114,13 @@ export function web3WalletProvider(
         // A Web3Provider wraps a standard Web3 provider, which is
         // what Metamask injects as window.ethereum into each page
         try {
-          // create a new instance of ehters js using web3 provider
-          await window.ethereum.enable().then(provider = new ethers.providers.Web3Provider(window.ethereum, 'any'));
+          // create a new instance of ethers js using web3 provider
+          await window.ethereum.enable().then(provider = (new ethers.providers.Web3Provider(window.ethereum, 'any')));
           const network = await provider.getNetwork(); // get the network
 
           // make sure user is connected to the same network as specified
           const specifiedNetworkId = parseInt(networkConfig?.chainId);
-          const currentNetworkId = parseInt(network?.chainId);
+          const currentNetworkId = network?.chainId;
           if ( specifiedNetworkId !== currentNetworkId ) {
             throw new Error(`Invalid Network, Please select the specified network in the Wallet. Specified Network: ${JSON.stringify(networkConfig)} | Selected Network: ${JSON.stringify(network)}`);
           }
@@ -119,7 +128,7 @@ export function web3WalletProvider(
           signer = provider.getSigner(); // get and set the signer
 
           // get all accounts
-          const accounts = await provider.send('eth_requestAccounts') || [];
+          const accounts = await provider.send('eth_requestAccounts', [] ) || [];
           selectedAccount = accounts.length > 0 ? accounts[0] : null;
 
           // setup network change listener
@@ -171,8 +180,9 @@ export function web3WalletProvider(
     /** login is not required for web3 provider, connecting to wallet can be considered as login */
     function login(accountName: string, authorization: string = WEB3_DEFAULT_PERMISSION) : Promise<WalletAuth> {
       return new Promise<WalletAuth>(async (resolve, reject) => {
+        assertIsConnected(reject)
         try {
-          const accounts = await provider.send('eth_requestAccounts');
+          const accounts = await provider.send('eth_requestAccounts', [] );
           const account = accounts[0];
           const output = {
             permission: 'active',
@@ -195,6 +205,7 @@ export function web3WalletProvider(
     /** sign arbitrary string using web3 provider */
     function signArbitrary(data: string, userMessage: string): Promise<any> {
       return new Promise(async (resolve, reject) => {
+        assertIsConnected(reject)
         try {
           const signedTransaction = await signer.signMessage(data);
           const splitSignature = ethers.utils.splitSignature(signedTransaction);
