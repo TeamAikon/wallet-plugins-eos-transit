@@ -9,13 +9,12 @@ import {
   SignatureProviderArgs,
   Web3WalletProviderOptions,
   WalletAuth,
-  WalletProvider,
+  WalletProvider
 } from './types';
-import { WEB3_DEFAULT_PERMISSION } from './helper';
+import { isAString, WEB3_DEFAULT_PERMISSION } from './helper';
 
 let provider: providers.Web3Provider;
 let signer: Signer;
-let loggedInAccount: WalletAuth | undefined;
 
 declare const window: any;
 
@@ -25,27 +24,20 @@ export function assertIsConnected(reject: any): void {
   }
 }
 
-/** get the raw transaction from response and remove unnecessary fields */
-function getRawTransaction(transaction: ethers.providers.TransactionResponse) {
-  const rawTransactionObject: ethers.Transaction = {
-    hash: transaction?.hash,
-    to: transaction?.to,
-    from: transaction?.from,
-    nonce: transaction?.nonce,
-    gasLimit: transaction?.gasLimit,
-    gasPrice: transaction?.gasPrice,
-    data: transaction?.data,
-    value: transaction?.value,
-    chainId: transaction?.chainId,
-    r: transaction?.r,
-    s: transaction?.s,
-    v: transaction?.v,
-    type: transaction?.type,
-    accessList: transaction?.accessList,
-    maxPriorityFeePerGas: transaction?.maxPriorityFeePerGas,
-    maxFeePerGas: transaction?.maxFeePerGas,
-  }
-  return encode(rawTransactionObject, { sortKeys: true });
+/** extract the raw transaction from sign response (remove unnecessary fields) */
+function mapTransactionResponseToTransaction(transactionResponse: ethers.providers.TransactionResponse) {
+  const {
+    hash,
+    blockNumber,
+    blockHash,
+    timestamp,
+    confirmations,
+    from,
+    raw,
+    wait,
+    ...transaction // everything that is not destructured above is the transaction
+  } = transactionResponse
+  return encode(transaction as ethers.Transaction, { sortKeys: true });
 }
 
 export function makeSignatureProvider(): SignatureProvider {
@@ -65,60 +57,30 @@ export function makeSignatureProvider(): SignatureProvider {
         try {
           assertIsConnected(reject);
           const decodedTransaction: any = decode(serializedTransaction);
-
+          let signedTransaction
           // if the decoded transaction contains a contract, execute specified function in the contract
           if (decodedTransaction?.contract) {
             const { contract: decodedContract } = decodedTransaction;
-
             const contract = new ethers.Contract(
               decodedTransaction.to,
               decodedContract.abi,
               provider
             );
             const contractConnectedWithSigner = contract.connect(signer);
-
-            // Web3 wallet expects the value to be a valid BigNumber not a string
-            // Either convert the value to BN here to send BN as value in the transaction
-            const contractParameters = [ ...decodedContract.parameters ];
-            contractParameters[1] = ethers.utils.parseEther(contractParameters[1].toString());
-
-            const transaction = await contractConnectedWithSigner.functions[
+            signedTransaction = await contractConnectedWithSigner.functions[
               decodedContract.method
-            ](...contractParameters);
-
-            const rawTransaction = getRawTransaction(transaction);
-            const { v, r, s } = transaction;
-            const signature = v && r && s ? JSON.stringify({ v, r, s }) : null;
-            resolve({
-              signatures: signature ? [signature] : [],
-              serializedTransaction: rawTransaction
-            });
-
+            ](...decodedContract.parameters);
+          } else {
+            signedTransaction = await signer.sendTransaction(decodedTransaction);
           }
-          // if the decoded transaction doesn't contain a contract, call sendTransaction on signer
-          else {
-            let finalTransaction = { ...decodedTransaction };
-            // check if decodedTransaction?.value is present and if it's string, Parse it to ether
-            if (
-              decodedTransaction?.value &&
-              typeof decodedTransaction.value === 'string'
-            ) {
-              finalTransaction = {
-                ...decodedTransaction,
-                value: ethers.utils.parseEther(decodedTransaction.value)
-              };
-            }
-            const signedTransactionResult = await signer.sendTransaction(
-              finalTransaction
-            );
-            const rawTransaction = getRawTransaction(signedTransactionResult);
-            const { v, r, s } = signedTransactionResult;
-            const signature = v && r && s ? JSON.stringify({ v, r, s }) : null;
-            resolve({
-              signatures: signature ? [signature] : [],
-              serializedTransaction: rawTransaction
-            });
-          }
+          // extract and return signed transaction and signature
+          const rawTransaction = mapTransactionResponseToTransaction(signedTransaction);
+          const { v, r, s } = signedTransaction;
+          const signature = v && r && s ? JSON.stringify({ v, r, s }) : null;
+          resolve({
+            signatures: signature ? [signature] : [],
+            serializedTransaction: rawTransaction
+          });
         } catch (error) {
           reject(error);
         }
@@ -137,9 +99,10 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
     network
   } = args || {};
 
-  let networkConfig: any;
+  let networkConfig: NetworkConfig;
   let selectedAccount: string | undefined;
   let selectedNetwork: ethers.providers.Network | undefined;
+  let loggedInAccount: WalletAuth | undefined;
 
   return function makeWalletProvider(network: NetworkConfig): WalletProvider {
     networkConfig = network;
@@ -159,29 +122,20 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
                 'any'
               ))
             );
-          selectedNetwork = await provider.getNetwork(); // get the currently selected network
-
-          // propmt the user to select the correct network
-          await window?.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: networkConfig.chainId }],
-          });
-          selectedNetwork = await provider.getNetwork(); // get the currently selected network
-
+          // get the currently selected network
+          selectedNetwork = await provider.getNetwork();
           // confirm current selected network matches requested network
-          assertIsDesiredNetwork(networkConfig);
-          signer = provider.getSigner(); // get and set the signer
+          await popupSelectDesiredNetworkIfNeeded(networkConfig);
+          signer = provider.getSigner(); // get the signer
 
           // set the first account as currently selected
-          selectedAccount = (await login()).accountName
+          selectedAccount = (await login()).accountName;
           // setup network change listener
-          provider.on('network', changeNetwork);
-
+          provider.on('network', onSelectNetwork);
           // setup account change listener
           // https://github.com/ethers-io/ethers.js/issues/1396
           // https://github.com/ethers-io/ethers.js/discussions/1560
-          // TODO: Throw error on account change
-          window.ethereum.on('accountsChanged', changeAccount);
+          window.ethereum.on('accountsChanged', onSelectAccount);
 
           if (provider) {
             resolve(true);
@@ -194,50 +148,55 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
       });
     }
 
-    /** reject if requiredNetwork is not already selected in the wallet */
-    async function assertIsDesiredNetwork(
-      // requiredNetwork: ethers.providers.Network,
-      requiredNetwork: Omit<ethers.providers.Network, 'chainId'> & {chainId: any},
-      reject?: any
+    /** if requiredNetwork is not already selected in the wallet, trigger the wallet to prmompt the user to select the network */
+    async function popupSelectDesiredNetworkIfNeeded(
+      requiredNetwork: any & { chainId: number | string }
     ): Promise<void> {
-      // TODO: selectedNetwork?.chainId type is number, requiredNetwork?.chainId type is string - fix it
-      if (selectedNetwork?.chainId !== parseInt(requiredNetwork?.chainId)) {
-        try {
-          // propmt the user to select the correct network
-          await window?.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: networkConfig.chainId }],
-          });
-          selectedNetwork = await provider.getNetwork(); // get the currently selected network          
-        } catch (err) {
-          const errMsg = `Desired network not selected in wallet: Please select the it using the Wallet. Specified Network: ${JSON.stringify(
-            requiredNetwork
-          )}`;
-          if(reject) reject(errMsg);
-          throw new Error(errMsg)  
-        }
+      const { chainIdInt, chainIdHex } = getChainIdFromNetwork(requiredNetwork)
+      if (selectedNetwork?.chainId === chainIdInt) return;
+      // propmt the user to select the correct network
+      await window?.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: chainIdHex }]
+      });
+      selectedNetwork = await provider.getNetwork();
+      // if desired network not selected, throw
+      assertIsDesiredNetwork(requiredNetwork)
+    }
+
+    /** reject if requiredNetwork is not already selected in the wallet */
+    function assertIsDesiredNetwork(
+      requiredNetwork: any & { chainId: number | string }
+    ): void {
+      const { chainIdInt } = getChainIdFromNetwork(requiredNetwork)
+      if (selectedNetwork?.chainId !== chainIdInt) {
+        const errMsg = `Desired network not selected in wallet: Please select the it using the Wallet. Specified Network: ${JSON.stringify(
+          requiredNetwork
+        )}`;
+        throw new Error(errMsg);
       }
     }
 
+    /** convert network chainId to int if needed */
+    function getChainIdFromNetwork(network: any & { chainId: number | string }): { chainIdInt: number, chainIdHex: string } {
+      const { chainId } = network;
+      const chainIdInt = isAString(chainId) ? parseInt(chainId) : chainId;
+      const chainIdHex = `0x${chainIdInt}`
+      return { chainIdInt, chainIdHex }
+    }
+
     /** called when wallet user changes network */
-    function changeNetwork(
+    function onSelectNetwork(
       network: ethers.providers.Network,
       oldNetwork: ethers.providers.Network
     ): void {
-      console.log('Selected network:', network);
-      assertIsDesiredNetwork(network);
       selectedNetwork = network;
     }
 
     /** called when wallet user changes accounts */
-    function changeAccount(accounts: string[]) {
+    function onSelectAccount(accounts: string[]) {
       const account = accounts?.length > 0 ? accounts[0] : undefined;
       selectedAccount = account;
-      console.log(
-        'accountsChanged - accounts, selectedAccount',
-        accounts,
-        selectedAccount
-      );
     }
 
     /**
@@ -311,7 +270,7 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
     }
 
     /** sign arbitrary string using web3 provider */
-    function signArbitrary(data: string, userMessage: string): Promise<any> {
+    function signArbitrary(data: string, userMessage: string): Promise<string> {
       return new Promise(async (resolve, reject) => {
         assertIsConnected(reject);
         try {
