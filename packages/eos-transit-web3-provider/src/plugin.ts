@@ -1,5 +1,6 @@
 import { ethers, providers, Signer } from 'ethers';
 import { decode, encode } from '@msgpack/msgpack';
+import WalletConnectProvider from "@walletconnect/web3-provider";
 import {
   DiscoverResponse,
   DiscoveryOptions,
@@ -13,7 +14,11 @@ import {
 } from './types';
 import { isAString, WEB3_DEFAULT_PERMISSION } from './helper';
 
-let provider: providers.Web3Provider;
+interface WalletConnectProviderWithExtraProps extends providers.Web3Provider {
+  disconnect? : any
+}
+
+let provider: WalletConnectProviderWithExtraProps;
 let signer: Signer;
 
 declare const window: any;
@@ -42,7 +47,7 @@ function mapTransactionResponseToTransaction(transactionResponse: ethers.provide
 
 export function makeSignatureProvider(): SignatureProvider {
   return {
-    /** Web3 provider doesn't support discovering keys from the wallet. */
+    /** walletConnect provider doesn't support discovering keys from the wallet. */
     async getAvailableKeys(): Promise<string[]> {
       return new Promise((resolve, reject) => {
         reject('Web3: getAvailableKeys is not supported');
@@ -89,12 +94,12 @@ export function makeSignatureProvider(): SignatureProvider {
   };
 }
 
-export function web3WalletProvider(args: Web3WalletProviderOptions) {
+export function walletConnectWeb3WalletProvider(args: Web3WalletProviderOptions) {
   const {
     id = 'web3',
-    name = 'Web3 Web Wallet',
-    shortName = 'Web3',
-    description = 'Use Web3 Web Wallet to sign your Ethereum transactions',
+    name = 'Wallet Connect Web3 Wallet',
+    shortName = 'WalletConnect',
+    description = 'Use Wallet Connect Wallet to sign your Ethereum transactions',
     errorTimeout,
     network
   } = args || {};
@@ -107,21 +112,24 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
   return function makeWalletProvider(network: NetworkConfig): WalletProvider {
     networkConfig = network;
 
-    /** Connect with a web3 provider - usually browser extension like MetaMask */
+    /** Connect with a walletConnect provider - usually applications like Trust Wallet, CoinBase Wallet, etc */
     function connect(appName: string): Promise<boolean> {
       return new Promise(async (resolve, reject) => {
         // A Web3Provider wraps a standard Web3 provider, which is
         // what Metamask injects as window.ethereum into each page
         try {
-          // create a new instance of ethers js using web3 provider
-          await window.ethereum
-            .enable()
-            .then(
-              (provider = new ethers.providers.Web3Provider(
-                window.ethereum,
-                'any'
-              ))
-            );
+          // create a new instance of ethers js using walletConnect provider
+          const walletConnectProvider = new WalletConnectProvider({
+            infuraId: '27e484dcd9e3efcfd25a83a78777cdf1',
+            qrcode: true,
+            rpc: {
+              1: "https://mainnet.infura.io/v3/4807102366a64a28b33e10d8751c9404",
+              3: "https://ropsten.infura.io/v3/4807102366a64a28b33e10d8751c9404",
+            },          
+          });
+          await walletConnectProvider.enable();
+          provider = new ethers.providers.Web3Provider(walletConnectProvider);
+
           // get the currently selected network
           selectedNetwork = await provider.getNetwork();
           // confirm current selected network matches requested network
@@ -201,7 +209,7 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
 
     /**
      * This method returns a list of all the accounts reported by the wallet
-     * For web3, it can't get the publicKey from the wallet so we don't return it here
+     * For walletConnect, it can't get the publicKey from the wallet so we don't return it here
      */
     async function discover(
       discoveryOptions?: DiscoveryOptions
@@ -223,12 +231,19 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
       });
     }
 
-    /** disconnect method is not supported by web3 provider (programmatically), User can directly disconnect from the wallet/extension */
+    /** disconnect from the walletConnect provider */
     function disconnect(): Promise<boolean> {
-      return Promise.resolve(true);
+      return new Promise(async (resolve, reject) => {
+        try {
+          await provider?.disconnect();
+          resolve(true);
+        } catch (error) {
+          reject(error);
+        }
+      });
     }
 
-    /** login is not required for web3 provider, connecting to wallet can be considered as login */
+    /** login is not required for walletConnect provider, connecting to wallet can be considered as login */
     async function login(
       accountName?: string,
       authorization: string = WEB3_DEFAULT_PERMISSION
@@ -261,15 +276,16 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
       });
     }
 
-    /** Logout functionality is not present in web3 provider and cannot be implemented */
+    /** Logout functionality is not present in walletConnect provider but disconnect method is present */
     function logout(accountName?: string): Promise<boolean> {
-      return new Promise((resolve, reject) => {
+      return new Promise(async (resolve, reject) => {
         loggedInAccount = undefined;
+        await disconnect();
         resolve(true);
       });
     }
 
-    /** sign arbitrary string using web3 provider */
+    /** sign arbitrary string using walletConnect provider */
     function signArbitrary(data: string, userMessage: string): Promise<string> {
       return new Promise(async (resolve, reject) => {
         assertIsConnected(reject);
@@ -309,4 +325,4 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
   };
 }
 
-export default web3WalletProvider;
+export default walletConnectWeb3WalletProvider;
