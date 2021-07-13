@@ -25,19 +25,36 @@ export function assertIsConnected(reject: any): void {
 }
 
 /** extract the raw transaction from sign response (remove unnecessary fields) */
-function mapTransactionResponseToTransaction(transactionResponse: ethers.providers.TransactionResponse) {
+function mapTransactionResponseToTransaction(
+  transactionResponse: ethers.providers.TransactionResponse
+) {
   const {
-    hash,
-    blockNumber,
-    blockHash,
-    timestamp,
-    confirmations,
+    to,
     from,
-    raw,
-    wait,
-    ...transaction // everything that is not destructured above is the transaction
-  } = transactionResponse
-  return encode(transaction as ethers.Transaction, { sortKeys: true });
+    nonce,
+    gasLimit,
+    gasPrice,
+    data,
+    value,
+    chainId,
+    r,
+    s,
+    v,
+  } = transactionResponse;
+  const transaction = {
+    to,
+    from,
+    nonce,
+    gasLimit,
+    gasPrice,
+    data,
+    value,
+    chainId,
+    r,
+    s,
+    v,
+  };
+  return transaction as ethers.Transaction;
 }
 
 export function makeSignatureProvider(): SignatureProvider {
@@ -57,7 +74,7 @@ export function makeSignatureProvider(): SignatureProvider {
         try {
           assertIsConnected(reject);
           const decodedTransaction: any = decode(serializedTransaction);
-          let signedTransaction
+          let signedTransaction: ethers.providers.TransactionResponse;
           // if the decoded transaction contains a contract, execute specified function in the contract
           if (decodedTransaction?.contract) {
             const { contract: decodedContract } = decodedTransaction;
@@ -74,12 +91,15 @@ export function makeSignatureProvider(): SignatureProvider {
             signedTransaction = await signer.sendTransaction(decodedTransaction);
           }
           // extract and return signed transaction and signature
-          const rawTransaction = mapTransactionResponseToTransaction(signedTransaction);
-          const { v, r, s } = signedTransaction;
-          const signature = v && r && s ? JSON.stringify({ v, r, s }) : null;
+          const { hash, from, r, s, v, ...transaction } = mapTransactionResponseToTransaction(signedTransaction);
+          const signature = ethers.utils.joinSignature({ r, s, v } as {r:string, s:string, v:number});
+          const raw = ethers.utils.serializeTransaction(transaction); // returns RLP encoded tx
+          const msgHash = ethers.utils.keccak256(raw); // as specified by ECDSA
+          console.log('sign public key:', getPublicKeyFromSignedHash(msgHash, signature));
+          console.log('sign address:', from);
           resolve({
             signatures: signature ? [signature] : [],
-            serializedTransaction: rawTransaction
+            serializedTransaction: encode(raw)
           });
         } catch (error) {
           reject(error);
@@ -87,6 +107,16 @@ export function makeSignatureProvider(): SignatureProvider {
       });
     }
   };
+}
+
+/** extract a public key using the transaction/message hash and signature */
+export function getPublicKeyFromSignedHash(
+  messageHash: string,
+  signature: string
+) {
+  const msgHashBytes = ethers.utils.arrayify(messageHash);
+  let publicKey = ethers.utils.recoverPublicKey(msgHashBytes, signature);
+  return publicKey;
 }
 
 export function web3WalletProvider(args: Web3WalletProviderOptions) {
@@ -152,7 +182,7 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
     async function popupSelectDesiredNetworkIfNeeded(
       requiredNetwork: any & { chainId: number | string }
     ): Promise<void> {
-      const { chainIdInt, chainIdHex } = getChainIdFromNetwork(requiredNetwork)
+      const { chainIdInt, chainIdHex } = getChainIdFromNetwork(requiredNetwork);
       if (selectedNetwork?.chainId === chainIdInt) return;
       // propmt the user to select the correct network
       await window?.ethereum.request({
@@ -161,14 +191,14 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
       });
       selectedNetwork = await provider.getNetwork();
       // if desired network not selected, throw
-      assertIsDesiredNetwork(requiredNetwork)
+      assertIsDesiredNetwork(requiredNetwork);
     }
 
     /** reject if requiredNetwork is not already selected in the wallet */
     function assertIsDesiredNetwork(
       requiredNetwork: any & { chainId: number | string }
     ): void {
-      const { chainIdInt } = getChainIdFromNetwork(requiredNetwork)
+      const { chainIdInt } = getChainIdFromNetwork(requiredNetwork);
       if (selectedNetwork?.chainId !== chainIdInt) {
         const errMsg = `Desired network not selected in wallet: Please select the it using the Wallet. Specified Network: ${JSON.stringify(
           requiredNetwork
@@ -178,11 +208,13 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
     }
 
     /** convert network chainId to int if needed */
-    function getChainIdFromNetwork(network: any & { chainId: number | string }): { chainIdInt: number, chainIdHex: string } {
+    function getChainIdFromNetwork(
+      network: any & { chainId: number | string }
+    ): { chainIdInt: number; chainIdHex: string } {
       const { chainId } = network;
       const chainIdInt = isAString(chainId) ? parseInt(chainId) : chainId;
-      const chainIdHex = `0x${chainIdInt}`
-      return { chainIdInt, chainIdHex }
+      const chainIdHex = `0x${chainIdInt}`;
+      return { chainIdInt, chainIdHex };
     }
 
     /** called when wallet user changes network */
@@ -269,13 +301,25 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
       });
     }
 
-    /** sign arbitrary string using web3 provider */
+    /** sign arbitrary string using web3 provider 
+        Returns the signed prefixed-message. This MUST treat:
+        - Bytes as a binary message
+        - string as a UTF8-message
+        i.e. "0x1234" is a SIX (6) byte string, NOT 2 bytes of data  
+      */
     function signArbitrary(data: string, userMessage: string): Promise<string> {
       return new Promise(async (resolve, reject) => {
         assertIsConnected(reject);
         try {
-          const signedTransaction = await signer.signMessage(data);
-          resolve(signedTransaction);
+          const signature = await signer.signMessage(data);
+          const dataHash = ethers.utils.hashMessage(data);
+          const address = ethers.utils.verifyMessage(data, signature);
+          console.log('signArbitrary address:', address);
+          console.log(
+            'signArbitrary public key:',
+            getPublicKeyFromSignedHash(dataHash, signature)
+          );
+          resolve(signature);
         } catch (err) {
           reject(err);
         }
@@ -289,9 +333,9 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
         name,
         shortName,
         description,
-        isWalletInterface: true,
+        isWalletInterface: true, // web3 is a wallet abstraction - not a specific wallet
         walletMetadata: {
-          name: 'unspecified',
+          name: 'unspecified', // TODO: Get wallet name from web3 provider
           shortName: 'unspecified',
           description: 'unspecified'
         }
