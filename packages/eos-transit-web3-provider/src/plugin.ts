@@ -1,6 +1,7 @@
 import { ethers, providers, Signer } from 'ethers';
 import { decode, encode } from '@msgpack/msgpack';
 import {
+  DiscoveryAccount,
   DiscoverResponse,
   DiscoveryOptions,
   NetworkConfig,
@@ -15,6 +16,8 @@ import { isAString, WEB3_DEFAULT_PERMISSION } from './helper';
 
 let provider: providers.Web3Provider;
 let signer: Signer;
+let accountToPublicKeyCache: { account: string; publicKey: string }[] = [];
+let discoveredAccounts: WalletAuth[];
 
 declare const window: any;
 
@@ -39,7 +42,7 @@ function mapTransactionResponseToTransaction(
     chainId,
     r,
     s,
-    v,
+    v
   } = transactionResponse;
   const transaction = {
     to,
@@ -52,7 +55,7 @@ function mapTransactionResponseToTransaction(
     chainId,
     r,
     s,
-    v,
+    v
   };
   return transaction as ethers.Transaction;
 }
@@ -93,10 +96,12 @@ export function makeSignatureProvider(): SignatureProvider {
           // extract and return signed transaction and signature
           const { hash, from, r, s, v, ...transaction } = mapTransactionResponseToTransaction(signedTransaction);
           const signature = ethers.utils.joinSignature({ r, s, v } as {r:string, s:string, v:number});
-          const raw = ethers.utils.serializeTransaction(transaction); // returns RLP encoded tx
-          const msgHash = ethers.utils.keccak256(raw); // as specified by ECDSA
-          console.log('sign public key:', getPublicKeyFromSignedHash(msgHash, signature));
+          const raw = ethers.utils.serializeTransaction(transaction);
+          const msgHash = ethers.utils.keccak256(raw);
+          const publicKey = getPublicKeyFromSignedHash(msgHash, signature);
           console.log('sign address:', from);
+          console.log('sign public key:', publicKey);
+          addToAccountToPublicKeyMap(from as string, publicKey);
           resolve({
             signatures: signature ? [signature] : [],
             serializedTransaction: encode(raw)
@@ -107,6 +112,12 @@ export function makeSignatureProvider(): SignatureProvider {
       });
     }
   };
+}
+
+/** add a newly used public key so that it can show up next time discover is called */
+function addToAccountToPublicKeyMap(account: string, publicKey: string) {
+  const newKey = { account, publicKey };
+  accountToPublicKeyCache.push(newKey);
 }
 
 /** extract a public key using the transaction/message hash and signature */
@@ -223,12 +234,14 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
       oldNetwork: ethers.providers.Network
     ): void {
       selectedNetwork = network;
+      discover();
     }
 
     /** called when wallet user changes accounts */
     function onSelectAccount(accounts: string[]) {
       const account = accounts?.length > 0 ? accounts[0] : undefined;
       selectedAccount = account;
+      discover();
     }
 
     /**
@@ -241,18 +254,51 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
       return new Promise(async (resolve, reject) => {
         try {
           const accounts = await provider.listAccounts();
-          const response = accounts?.map(
-            account =>
-              ({
-                accountName: account,
-                permission: 'active'
-              } as WalletAuth)
-          );
+          const { accountMap, keys } = composeKeyToAccountMap(accounts);
+          const response = {
+            keyToAccountMap: accountMap,
+            keys
+          };
+          discoveredAccounts = accountMap.map(am => ({
+            publicKey: am.key,
+            accountName: am.accounts[0].account,
+            permission: am.accounts[0].authorization
+          }));
           resolve(response);
         } catch (error) {
           reject(error);
         }
       });
+    }
+
+    // Example: keyToAccountMap: [{
+    //   index: 0,
+    //   key: {publicKey},
+    //   accounts: [{
+    //       account: {chainAccount},
+    //       authorization: ‘active’
+    //   }]
+    // },{
+    /** compose a map between public keys and the accounts/permission used by each one */
+    function composeKeyToAccountMap(accounts: string[]) {
+      const accountMap: DiscoveryAccount[] = accounts?.map((account, index) => {
+        const publicKey = accountToPublicKeyCache.find(
+          a => a.account === account
+        )?.publicKey;
+        let keyMap = {
+          index,
+          key: publicKey, // if we have a public key in the cache (captured when signing a tx), add it here)
+          accounts: [
+            {
+              account,
+              authorization: 'active'
+            }
+          ]
+        };
+        return keyMap;
+      });
+      const keys = accountMap.map(km => ({ index: km.index, key: km?.key }));
+      return { accountMap, keys };
     }
 
     /** disconnect method is not supported by web3 provider (programmatically), User can directly disconnect from the wallet/extension */
@@ -268,9 +314,9 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
       return new Promise<WalletAuth>(async (resolve, reject) => {
         assertIsConnected(reject);
         try {
-          const accounts = await discover();
+          await discover();
           if (accountName) {
-            const account = accounts.find(a => accountName === a.accountName);
+            const account = discoveredAccounts.find(a => accountName === a.accountName);
             if (!account) {
               reject(
                 `Account ${accountName} not found in wallet - can't login with it`
@@ -279,12 +325,12 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
               resolve(account);
             }
           }
-          if (!accounts || accounts.length === 0) {
+          if (!discoveredAccounts || discoveredAccounts.length === 0) {
             reject(
               'No accounts in wallet - please add or connect accounts in the wallet before logging in'
             );
           }
-          const firstAccount = accounts[0];
+          const firstAccount = discoveredAccounts[0];
           loggedInAccount = firstAccount;
           resolve(firstAccount);
         } catch (error) {
@@ -314,11 +360,10 @@ export function web3WalletProvider(args: Web3WalletProviderOptions) {
           const signature = await signer.signMessage(data);
           const dataHash = ethers.utils.hashMessage(data);
           const address = ethers.utils.verifyMessage(data, signature);
+          const publicKey = getPublicKeyFromSignedHash(dataHash, signature);
           console.log('signArbitrary address:', address);
-          console.log(
-            'signArbitrary public key:',
-            getPublicKeyFromSignedHash(dataHash, signature)
-          );
+          console.log('signArbitrary public key:', publicKey);
+          addToAccountToPublicKeyMap(address, publicKey);
           resolve(signature);
         } catch (err) {
           reject(err);
