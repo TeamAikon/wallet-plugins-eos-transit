@@ -3,7 +3,8 @@
   "compilerOptions": {
     "outDir": "./lib",
     "declaration": true,
-    "declarationDir": "./lib"
+    "declarationDir": "./lib",
+    "downlevelIteration": true
   },
   "files": ["src/index.ts"]
 }
