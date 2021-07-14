@@ -1,67 +1,3 @@
-declare global {
-  var Web3: Web3Type;
-}
-
-export declare type KeyModifierCallback = (
-  discoveryData: DiscoveryData
-) => DiscoveryData;
-
-export declare type KeyLookupCallback = (
-  discoveryData: DiscoveryData,
-  callback: DiscoverContinueCallback
-) => void;
-
-export declare type DiscoverContinueCallback = (
-  discoveredAccounts: DiscoveryAccount[]
-) => void;
-
-export type Web3Type = {
-  connect(): Promise<boolean>;
-  accounts(props: ConnectProps): Promise<Web3AccountInfo[]>;
-  sign(TxnObject: TxnObject): Promise<Web3SignSuccessResponse>;
-  send(props: SignProps): Promise<Web3TransactionSuccessResponse>;
-}
-type ConnectProps = {
-  ledger: string;
-}
-
-export type TxnObject = {
-  to: string;
-  from: string;
-  fee: number;
-  type: EthereumTransactionTypeCode;
-  amount: number;
-  firstRound: number;
-  lastRound: number;
-  genesisID: string;
-  genesisHash: string;
-  note: string;
-}
-
-type SignProps = {
-  tx: string;
-  ledger: string;
-}
-
-export enum EthereumTransactionTypeCode {
-  AssetConfig = 'acfg',
-  AssetFreeze = 'afrz',
-  AssetTransfer = 'axfer',
-  KeyRegistration = 'keyreg',
-  Payment = 'pay'
-}
-
-export type Web3AccountInfo = {
-  address: string;
-}
-export type Web3SignSuccessResponse = {
-  txID: string;
-  blob: string;
-}
-export type Web3TransactionSuccessResponse = {
-  txId: string;
-}
-
 export enum EthereumNetworkType {
   EthMain = 'eth_main',
   EthRopsten = 'eth_ropsten',
@@ -122,9 +58,6 @@ export type SignatureProvider = {
 export type DiscoveryOptions = {
 }
 
-/** stringified account info - account, authorization, network */
-export type DiscoverResponse = WalletAuth[];
-
 export type SignatureProviderArgs = {
   serializedTransaction: Uint8Array;
   requiredKeys: string[];
@@ -135,17 +68,17 @@ export type PushTransactionArgs = {
   serializedTransaction: Uint8Array;
 }
 
-export type DiscoveryData = {
+export type DiscoverResponse = {
   keyToAccountMap: DiscoveryAccount[];
   keys?: {
     index: number;
-    key: string;
+    key: string | undefined;
   }[];
 }
 
 export type DiscoveryAccount = {
   index: number;
-  key: string;
+  key: string | undefined;
   accounts: {
     account: string;
     authorization: string;
