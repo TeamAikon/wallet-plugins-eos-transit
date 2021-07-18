@@ -19,6 +19,7 @@ export type Web3WalletProviderOptions = {
 }
 
 export type WalletProviderMetadata = {
+  id: string,
   name?: string;
   shortName?: string;
   description?: string;
