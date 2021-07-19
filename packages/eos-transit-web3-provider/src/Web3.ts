@@ -1,19 +1,29 @@
 import { ethers, providers, Signer } from 'ethers';
 import { decode, encode } from '@msgpack/msgpack';
 
-import {
-  DiscoveryAccount,
-  DiscoverResponse,
-  DiscoveryOptions,
-  PushTransactionArgs,
-  SignatureProvider,
-  SignatureProviderArgs,
-  Web3WalletProviderOptions,
-  WalletProvider
-} from './types';
-
-
 /** all Types used within Web3Plugin Class */
+
+export type DiscoveryAccount = {
+  index: number;
+  key: string | undefined;
+  accounts: {
+    account: string;
+    authorization: string;
+  }[];
+}
+
+/** no discover options needed for Web3 */
+export type DiscoveryOptions = {
+}
+
+export type DiscoverResponse = {
+  keyToAccountMap: DiscoveryAccount[];
+  keys?: {
+    index: number;
+    key: string | undefined;
+  }[];
+}
+
 export type NetworkConfig = {
   name?: string;
   protocol?: string;
@@ -21,6 +31,41 @@ export type NetworkConfig = {
   port?: number;
   chainId: string;
 }
+
+export type PushTransactionArgs = {
+  signatures: string[];
+  serializedTransaction: Uint8Array;
+}
+
+export type SignatureProvider = {
+  /** Public keys associated with the private keys that the `SignatureProvider` holds */
+  getAvailableKeys: () => Promise<string[]>;
+  /** Sign a transaction */
+  sign: (args: SignatureProviderArgs) => Promise<PushTransactionArgs>;
+}
+
+export type SignatureProviderArgs = {
+  serializedTransaction: Uint8Array;
+  requiredKeys: string[];
+}
+
+export interface WalletProvider {
+  id?: string;
+  meta?: WalletProviderMetadata;
+  signatureProvider: SignatureProvider;
+  connect(appName: string, web3Provider?: providers.ExternalProvider): Promise<boolean>;
+  discover(discoveryOptions: DiscoveryOptions): Promise<DiscoverResponse>;
+  disconnect(): Promise<boolean>;
+  login(
+    accountName?: string,
+    authorization?: string,
+    index?: number,
+    key?: string
+  ): Promise<WalletAuth>;
+  logout(accountName?: string): Promise<boolean>;
+  signArbitrary(data: string, userMessage: string): Promise<string>;
+}
+
 export type WalletAuth = {
   accountName: string;
   permission: string;
@@ -28,7 +73,7 @@ export type WalletAuth = {
 }
 
 export type WalletProviderMetadata = {
-  id: string,
+  id?: string,
   name?: string;
   shortName?: string;
   description?: string;
@@ -39,8 +84,6 @@ export type WalletProviderMetadata = {
     description?: string;
   }
 }
-
-declare const window: any;
 
 export const WEB3_DEFAULT_PERMISSION = 'active';
 
@@ -230,7 +273,7 @@ class Web3Plugin {
   }
 
   /** Make the signature provider, this contains sign and getAvailableKeys methods */
-  makeSignatureProvider() {
+  makeSignatureProvider(): SignatureProvider {
     return {
       sign: this.sign,
       getAvailableKeys: this.getAvailableKeys,
@@ -238,7 +281,7 @@ class Web3Plugin {
   }
 
   /** This contains all the methods required and used by the eos-transit plugin */
-  makeWalletProvider() {
+  makeWalletProvider(): WalletProvider {
     return {
       id: this.metaData.id,
       meta: {
@@ -261,7 +304,6 @@ class Web3Plugin {
       signArbitrary: this.signArbitrary
     }
   }
-
 
   /** Helper Methods
    * These are all the helper methods used by this class and web3 providers.
@@ -310,7 +352,6 @@ class Web3Plugin {
     return publicKey;  
   }
 
-
   /** Add a newly used public key so that it can show up next time discover is called */
   private addToAccountToPublicKeyMap(account: string, publicKey: string) {
     const newKey = { account, publicKey };
@@ -349,7 +390,7 @@ class Web3Plugin {
   }
 
   /** Web3 provider doesn't support discovering keys from the wallet. */
-  private async getAvailableKeys() {
+  private async getAvailableKeys(): Promise<string[]> {
     return new Promise((resolve, reject) => {
       reject(`${this.metaData.id}: getAvailableKeys is not supported`);
     });
