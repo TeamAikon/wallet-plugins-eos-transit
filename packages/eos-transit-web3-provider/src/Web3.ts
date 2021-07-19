@@ -80,7 +80,7 @@ class Web3Plugin {
   connect(appName: string, web3Provider: providers.ExternalProvider): Promise<boolean> {
     return new Promise(async (resolve, reject) => {
       try {
-        // create and set web3 provider
+        // create a new instance of ethers js using web3 provider
         this.provider = new ethers.providers.Web3Provider(web3Provider, 'any');
         // set the signer
         this.signer = this.provider.getSigner(); // get the signer from provider
@@ -93,7 +93,6 @@ class Web3Plugin {
         } else {
           reject(`${this.metaData.id}: Connect error`);
         }
-
       } catch (error) {
         reject(error);
       }
@@ -126,9 +125,8 @@ class Web3Plugin {
   }
 
   /** Disconnect from the currently connected web3 provider */
-  async disconnect() {
-    console.log('disconnect');
-
+  async disconnect(): Promise<boolean> {
+    return Promise.resolve(true);
   }
 
   /** Login is not required for web3 provider, connecting to wallet can be considered as login */
@@ -183,8 +181,6 @@ class Web3Plugin {
         const dataHash = ethers.utils.hashMessage(data);
         const address = ethers.utils.verifyMessage(data, signature);
         const publicKey = this.getPublicKeyFromSignedHash(dataHash, signature);
-        console.log('signArbitrary address:', address);
-        console.log('signArbitrary public key:', publicKey);
         this.addToAccountToPublicKeyMap(address, publicKey);
         resolve(signature);
       } catch (err) {
