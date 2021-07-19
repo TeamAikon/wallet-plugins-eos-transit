@@ -50,30 +50,30 @@ export const WEB3_DEFAULT_PERMISSION = 'active';
  * this supports browser based extensions and walletConnect
  */
 class Web3Plugin {
-  provider: providers.Web3Provider;
-  signer: Signer;
   accountToPublicKeyCache: { account: string; publicKey: string }[] = [];
-  metaData: WalletProviderMetadata
   discoveredAccounts: WalletAuth[] = [];
-
+  loggedInAccount: WalletAuth | undefined;
+  metaData: WalletProviderMetadata
   networkConfig: NetworkConfig;
+  provider: providers.Web3Provider;
   selectedAccount: string | undefined;
   selectedNetwork: providers.Network | undefined;
-  loggedInAccount: WalletAuth | undefined;
+  signer: Signer;
   
   constructor(metaData: WalletProviderMetadata) {
     this.metaData = metaData;
 
     // set the method binding here
-    this.makeWalletProvider = this.makeWalletProvider.bind(this);
     this.assertIsConnected = this.assertIsConnected.bind(this);
     this.connect = this.connect.bind(this);
-    this.login = this.login.bind(this);
     this.discover = this.discover.bind(this);
+    this.getAvailableKeys = this.getAvailableKeys.bind(this);
+    this.login = this.login.bind(this);
+    this.makeSignatureProvider = this.makeSignatureProvider.bind(this);
+    this.makeWalletProvider = this.makeWalletProvider.bind(this);
+    this.setupEventListeners = this.setupEventListeners.bind(this);
     this.sign = this.sign.bind(this);
     this.signArbitrary = this.signArbitrary.bind(this);
-    this.makeSignatureProvider = this.makeSignatureProvider.bind(this);
-    this.getAvailableKeys = this.getAvailableKeys.bind(this);
   }
 
   /** Connect with the given provider and return boolen response. */
@@ -86,6 +86,7 @@ class Web3Plugin {
         this.signer = this.provider.getSigner(); // get the signer from provider
 
         // setup the event listeners here.
+        this.setupEventListeners();
 
         // return the response
         if (this.provider) {
@@ -265,6 +266,13 @@ class Web3Plugin {
   /** Helper Methods
    * These are all the helper methods used by this class and web3 providers.
    */
+
+  /** Setup all event listeners here
+   * Each subclass must use this method to setup event listeners
+  */
+  setupEventListeners() {
+    // setup event listeners
+  }
 
   /** Compose a map between public keys and the accounts/permission used by each one */
   private composeKeyToAccountMap(accounts: string[]) {
