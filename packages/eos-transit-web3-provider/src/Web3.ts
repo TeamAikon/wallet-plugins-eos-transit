@@ -281,7 +281,9 @@ class Web3Plugin {
   }
 
   /** This contains all the methods required and used by the eos-transit plugin */
-  makeWalletProvider(): WalletProvider {
+  makeWalletProvider(network: NetworkConfig): WalletProvider {
+    this.networkConfig = network;
+
     return {
       id: this.metaData.id,
       meta: {
