@@ -13,7 +13,7 @@ import {
 } from './types';
 
 
-/** All Types used within Web3Plugin Class */
+/** all Types used within Web3Plugin Class */
 export type NetworkConfig = {
   name?: string;
   protocol?: string;
@@ -42,11 +42,12 @@ export type WalletProviderMetadata = {
 
 declare const window: any;
 
-
+export const WEB3_DEFAULT_PERMISSION = 'active';
 
 
 /**
  * Web3 plugin class, This contains all the common methods for all Web3 providers.
+ * this supports browser based extensions and walletConnect
  */
 class Web3Plugin {
   provider: providers.Web3Provider;
@@ -63,19 +64,20 @@ class Web3Plugin {
   constructor(metaData: WalletProviderMetadata) {
     this.metaData = metaData;
 
-    // set the binding here
+    // set the method binding here
     this.makeWalletProvider = this.makeWalletProvider.bind(this);
     this.assertIsConnected = this.assertIsConnected.bind(this);
     this.connect = this.connect.bind(this);
+    this.login = this.login.bind(this);
     this.discover = this.discover.bind(this);
     this.sign = this.sign.bind(this);
     this.signArbitrary = this.signArbitrary.bind(this);
     this.makeSignatureProvider = this.makeSignatureProvider.bind(this);
+    this.getAvailableKeys = this.getAvailableKeys.bind(this);
   }
 
   /** Connect with the given provider and return boolen response. */
-  // TODO: Set type for web3Provider, This is bit different for WalletConnect and Web3Provider (Metamask) 
-  connect(appName: string, web3Provider: any): Promise<boolean> {
+  connect(appName: string, web3Provider: providers.ExternalProvider): Promise<boolean> {
     return new Promise(async (resolve, reject) => {
       try {
         // create and set web3 provider
@@ -97,7 +99,6 @@ class Web3Plugin {
       }
     });
   }
-
 
   /**
    * This method returns a list of all the accounts reported by the wallet
@@ -124,45 +125,51 @@ class Web3Plugin {
     });
   }
 
-  /** compose a map between public keys and the accounts/permission used by each one */
-  private composeKeyToAccountMap(accounts: string[]) {
-    const accountMap: DiscoveryAccount[] = accounts?.map((account, index) => {
-      const publicKey = this.accountToPublicKeyCache.find(
-        a => a.account === account
-      )?.publicKey;
-      let keyMap = {
-        index,
-        key: publicKey, // if we have a public key in the cache (captured when signing a tx), add it here)
-        accounts: [
-          {
-            account,
-            authorization: 'active'
-          }
-        ]
-      };
-      return keyMap;
-    });
-    const keys = accountMap.map(km => ({ index: km.index, key: km?.key }));
-    return { accountMap, keys };
-  }
-
-
+  /** Disconnect from the currently connected web3 provider */
   async disconnect() {
     console.log('disconnect');
 
   }
 
-  async login() {
-    console.log('login');
-
+  /** Login is not required for web3 provider, connecting to wallet can be considered as login */
+  async login(accountName?: string, authorization: string = WEB3_DEFAULT_PERMISSION): Promise<WalletAuth> {
+    return new Promise<WalletAuth>(async (resolve, reject) => {
+      this.assertIsConnected(reject);
+      try {
+        await this.discover();
+        if (accountName) {
+          const account = this.discoveredAccounts.find(a => accountName === a.accountName);
+          if (!account) {
+            reject(
+              `Account ${accountName} not found in wallet - can't login with it`
+            );
+          } else {
+            resolve(account);
+          }
+        }
+        if (!this.discoveredAccounts || this.discoveredAccounts.length === 0) {
+          reject(
+            'No accounts in wallet - please add or connect accounts in the wallet before logging in'
+          );
+        }
+        const firstAccount = this.discoveredAccounts[0];
+        this.loggedInAccount = firstAccount;
+        resolve(firstAccount);
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
-  async logout() {
-    console.log('logout');
-
+  /** Logout functionality is not present in web3 provider and cannot be implemented */
+  async logout(accountName?: string): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      this.loggedInAccount = undefined;
+      resolve(true);
+    });
   }
 
-  /** sign arbitrary string using web3 provider 
+  /** Sign arbitrary string using web3 provider 
     Returns the signed prefixed-message. This MUST treat:
     - Bytes as a binary message
     - string as a UTF8-message
@@ -186,38 +193,12 @@ class Web3Plugin {
     });
   }
 
-  assertIsConnected(reject: any): void {
-    if (!this.provider) {
-      reject('Not connected. Call connect() before using this function');
-    }
-  }
-
-  /** extract a public key using the transaction/message hash and signature */
-  getPublicKeyFromSignedHash(
-    messageHash: string,
-    signature: string
-  ) {
-    const msgHashBytes = ethers.utils.arrayify(messageHash);
-    let publicKey = ethers.utils.recoverPublicKey(msgHashBytes, signature);
-    return publicKey;  
-  }
-
-
-  /** add a newly used public key so that it can show up next time discover is called */
-  addToAccountToPublicKeyMap(account: string, publicKey: string) {
-    const newKey = { account, publicKey };
-    this.accountToPublicKeyCache.push(newKey);  
-  }
-
-
   /** Signs the provided transaction */
   async sign({ serializedTransaction }: SignatureProviderArgs): Promise<PushTransactionArgs> {
-    console.log('sign')
     return new Promise(async (resolve, reject) => {
       try {
         this.assertIsConnected(reject);
         const decodedTransaction: any = decode(serializedTransaction);
-        console.log('decodedTransaction', decodedTransaction);
         let signedTransaction: ethers.providers.TransactionResponse;
         // if the decoded transaction contains a contract, execute specified function in the contract
         if (decodedTransaction?.contract) {
@@ -251,7 +232,88 @@ class Web3Plugin {
     });
   }
 
-  /** extract the raw transaction from sign response (remove unnecessary fields) */
+  /** Make the signature provider, this contains sign and getAvailableKeys methods */
+  makeSignatureProvider() {
+    return {
+      sign: this.sign,
+      getAvailableKeys: this.getAvailableKeys,
+    }
+  }
+
+  /** This contains all the methods required and used by the eos-transit plugin */
+  makeWalletProvider() {
+    return {
+      id: this.metaData.id,
+      meta: {
+        name: this.metaData.name,
+        shortName: this.metaData.shortName,
+        description: this.metaData.description,
+        isWalletInterface: this.metaData.isWalletInterface,
+        walletMetadata: {
+          name: this.metaData?.walletMetadata?.name,
+          shortName: this.metaData?.walletMetadata?.shortName,
+          description: this.metaData?.walletMetadata?.description
+        }
+      },
+      signatureProvider: this.makeSignatureProvider(),
+      connect: this.connect,
+      discover: this.discover,
+      disconnect: this.disconnect,
+      login: this.login,
+      logout: this.logout,
+      signArbitrary: this.signArbitrary
+    }
+  }
+
+
+  /** Helper Methods
+   * These are all the helper methods used by this class and web3 providers.
+   */
+
+  /** Compose a map between public keys and the accounts/permission used by each one */
+  private composeKeyToAccountMap(accounts: string[]) {
+    const accountMap: DiscoveryAccount[] = accounts?.map((account, index) => {
+      const publicKey = this.accountToPublicKeyCache.find(
+        a => a.account === account
+      )?.publicKey;
+      let keyMap = {
+        index,
+        key: publicKey, // if we have a public key in the cache (captured when signing a tx), add it here)
+        accounts: [
+          {
+            account,
+            authorization: 'active'
+          }
+        ]
+      };
+      return keyMap;
+    });
+    const keys = accountMap.map(km => ({ index: km.index, key: km?.key }));
+    return { accountMap, keys };
+  }
+
+  /** Check if the provider exists or not. If not throw */
+  assertIsConnected(reject: any): void {
+    if (!this.provider) {
+      reject('Not connected. Call connect() before using this function');
+    }
+  }
+
+  /** Extract a public key using the transaction/message hash and signature */
+  getPublicKeyFromSignedHash(messageHash: string, signature: string): string {
+    const msgHashBytes = ethers.utils.arrayify(messageHash);
+    let publicKey = ethers.utils.recoverPublicKey(msgHashBytes, signature);
+    return publicKey;  
+  }
+
+
+  /** Add a newly used public key so that it can show up next time discover is called */
+  addToAccountToPublicKeyMap(account: string, publicKey: string) {
+    const newKey = { account, publicKey };
+    this.accountToPublicKeyCache.push(newKey);  
+  }
+
+  /** Extract the raw transaction from sign response (remove unnecessary fields) */
   mapTransactionResponseToTransaction(transactionResponse: ethers.providers.TransactionResponse) {
     const {
       to,
@@ -282,46 +344,13 @@ class Web3Plugin {
     return transaction as ethers.Transaction;
   }
 
+  /** Web3 provider doesn't support discovering keys from the wallet. */
   async getAvailableKeys() {
-    console.log('getAvailableKeys');
-
+    return new Promise((resolve, reject) => {
+      reject(`${this.metaData.id}: getAvailableKeys is not supported`);
+    });
   }
-
-  makeSignatureProvider() {
-    return {
-      sign: this.sign,
-      getAvailableKeys: this.getAvailableKeys,
-    }
-  }
-
-  makeWalletProvider() {
-    console.log('makeWalletProvider');
-    return {
-      id: 'web3',
-      meta: {
-        name: 'web3',
-        shortName: 'web3 plugin',
-        description: 'web3 plugin description',
-        isWalletInterface: true,
-        walletMetadata: {
-          name: 'unspecified',
-          shortName: 'unspecified',
-          description: 'unspecified'
-        }
-      },
-      signatureProvider: this.makeSignatureProvider(),
-      connect: this.connect,
-      discover: this.discover,
-      disconnect: this.disconnect,
-      login: this.login,
-      logout: this.logout,
-      signArbitrary: this.signArbitrary
-    }
-  }
-
-
 
 }
 
 export default Web3Plugin;
-
