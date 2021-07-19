@@ -26,12 +26,9 @@ class Web3ProviderPlugin extends Web3 {
   }
 
   async connect(appName: string): Promise<boolean> {
-    // create a new instance of ethers js using web3 provider
     await window?.ethereum?.enable();
     return super.connect(appName, window.ethereum);
   }
-
-
 
 }
 
@@ -40,12 +37,18 @@ const config: WalletProviderMetadata = {
   name: 'Web3 Web Wallet',
   shortName: 'Web3',
   description: 'Use Web3 Web Wallet to sign your Ethereum transactions',
+  isWalletInterface: true,
+  walletMetadata: {
+    name: 'unspecified',
+    shortName: 'unspecified',
+    description: 'unspecified'
+  }
 };
 
 
 const web3ProviderPlugin = () => {
   const plugin = new Web3ProviderPlugin(config);
-  /** return the wallet provider */
+  // return the wallet provider
   return plugin.makeWalletProvider;
 };
 
