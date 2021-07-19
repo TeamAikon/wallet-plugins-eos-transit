@@ -289,14 +289,14 @@ class Web3Plugin {
   }
 
   /** Check if the provider exists or not. If not throw */
-  assertIsConnected(reject: any): void {
+  private assertIsConnected(reject: any): void {
     if (!this.provider) {
       reject('Not connected. Call connect() before using this function');
     }
   }
 
   /** Extract a public key using the transaction/message hash and signature */
-  getPublicKeyFromSignedHash(messageHash: string, signature: string): string {
+  private getPublicKeyFromSignedHash(messageHash: string, signature: string): string {
     const msgHashBytes = ethers.utils.arrayify(messageHash);
     let publicKey = ethers.utils.recoverPublicKey(msgHashBytes, signature);
     return publicKey;  
@@ -304,13 +304,13 @@ class Web3Plugin {
 
 
   /** Add a newly used public key so that it can show up next time discover is called */
-  addToAccountToPublicKeyMap(account: string, publicKey: string) {
+  private addToAccountToPublicKeyMap(account: string, publicKey: string) {
     const newKey = { account, publicKey };
     this.accountToPublicKeyCache.push(newKey);  
   }
 
   /** Extract the raw transaction from sign response (remove unnecessary fields) */
-  mapTransactionResponseToTransaction(transactionResponse: ethers.providers.TransactionResponse) {
+  private mapTransactionResponseToTransaction(transactionResponse: ethers.providers.TransactionResponse) {
     const {
       to,
       from,
@@ -341,7 +341,7 @@ class Web3Plugin {
   }
 
   /** Web3 provider doesn't support discovering keys from the wallet. */
-  async getAvailableKeys() {
+  private async getAvailableKeys() {
     return new Promise((resolve, reject) => {
       reject(`${this.metaData.id}: getAvailableKeys is not supported`);
     });
