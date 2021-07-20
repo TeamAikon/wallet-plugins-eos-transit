@@ -1,5 +1,5 @@
-import web3Provider from './plugin';
+import walletConnectProvider from './plugin';
 
-export default web3Provider;
+export default walletConnectProvider;
 
-export { EthereumNetworkType } from './types';
+export { EthereumNetworkType } from './Web3';
