@@ -1,18 +1,17 @@
 import { providers } from 'ethers';
-import Web3, { WalletProviderMetadata } from './Web3';
-
-/** Check if the given value is a string or instance of string */
-export function isAString(value: any): boolean {
-  if (!value) return false
-  return typeof value === 'string' || value instanceof String
-}
+import Web3, {
+  WalletProviderMetadata,
+  Web3WalletProviderOptions,
+  Web3WalletProviderAdditionalOptions,
+  isAString,
+} from './Web3';
 
 declare const window: any;
 
 class Web3ProviderPlugin extends Web3 {
 
-  constructor(metaData: WalletProviderMetadata) {
-    super(metaData);
+  constructor(metaData: WalletProviderMetadata, additionalOptions: Web3WalletProviderAdditionalOptions) {
+    super(metaData, additionalOptions);
 
     this.assertIsDesiredNetwork = this.assertIsDesiredNetwork.bind(this);
     this.getChainIdFromNetwork = this.getChainIdFromNetwork.bind(this);
@@ -27,7 +26,7 @@ class Web3ProviderPlugin extends Web3 {
         await window?.ethereum?.enable();
         const res = await super.connect(appName, window.ethereum);
 
-        // confirm current selected network matches requested network
+        // check if current selected network matches requested network, if not display network chenage popup
         await this.popupSelectDesiredNetworkIfNeeded(this.networkConfig);
         resolve(res);
       } catch (error) {
@@ -92,23 +91,32 @@ class Web3ProviderPlugin extends Web3 {
 
 }
 
-// plugin meta data
-const metaData: WalletProviderMetadata = {
-  id: 'web3',
-  name: 'Web3 Web Wallet',
-  shortName: 'Web3',
-  description: 'Use Web3 Web Wallet to sign your Ethereum transactions',
-  isWalletInterface: true,
-  walletMetadata: {
-    name: 'unspecified',
-    shortName: 'unspecified',
-    description: 'unspecified'
+
+// initialize the class and return it
+const web3ProviderPlugin = (args: Web3WalletProviderOptions) => {
+
+  // plugin meta data
+  const metaData: WalletProviderMetadata = {
+    id: args?.id || 'web3',
+    name: args?.name || 'Web3 Web Wallet',
+    shortName: args?.shortName || 'Web3',
+    description: args?.description || 'Use Web3 Web Wallet to sign your Ethereum transactions',
+    isWalletInterface: true,
+    walletMetadata: {
+      name: 'unspecified',
+      shortName: 'unspecified',
+      description: 'unspecified'
+    },
+  };
+
+  // additional optional args that might be passed while initializing the plugin
+  const additionalOptions: Web3WalletProviderAdditionalOptions = {
+    errorTimeout: args?.errorTimeout,
+    network: args?.network,
   }
-};
 
+  const plugin = new Web3ProviderPlugin(metaData, additionalOptions);
 
-const web3ProviderPlugin = () => {
-  const plugin = new Web3ProviderPlugin(metaData);
   // return the wallet provider
   return plugin.makeWalletProvider;
 };
