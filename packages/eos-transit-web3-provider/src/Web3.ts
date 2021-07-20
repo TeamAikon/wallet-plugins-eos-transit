@@ -24,6 +24,11 @@ export type DiscoverResponse = {
   }[];
 }
 
+export enum EthereumNetworkType {
+  EthMain = 'eth_main',
+  EthRopsten = 'eth_ropsten',
+}
+
 export type NetworkConfig = {
   name?: string;
   protocol?: string;
@@ -85,6 +90,39 @@ export type WalletProviderMetadata = {
   }
 }
 
+export type Web3WalletProviderOptions = {
+  id: string;
+  name: string;
+  shortName: string;
+  description?: string;
+  errorTimeout?: number;
+  network?: EthereumNetworkType;
+}
+
+export type Web3WalletProviderAdditionalOptions = {
+  errorTimeout?: number;
+  network?: EthereumNetworkType;
+}
+
+/** Export all helper functions */
+
+/** Check if the given value is a string or instance of string */
+export function isAString(value: any): boolean {
+  if (!value) return false
+  return typeof value === 'string' || value instanceof String
+}
+
+/** Clone and return a new object without given keys */
+export function cloneObjectWithoutSpecificKeys(originalObject: Object, keysToRemove: string[]) {
+  let newObject = Object.assign({}, originalObject);
+  if ( keysToRemove && keysToRemove.length > 0 ) {
+    keysToRemove.map( key => {
+      if ( newObject[key] ) { delete newObject[key]; }
+    });
+  }
+  return newObject;
+}
+
 export const WEB3_DEFAULT_PERMISSION = 'active';
 
 
@@ -96,15 +134,17 @@ class Web3Plugin {
   accountToPublicKeyCache: { account: string; publicKey: string }[] = [];
   discoveredAccounts: WalletAuth[] = [];
   loggedInAccount: WalletAuth | undefined;
-  metaData: WalletProviderMetadata
+  metaData: WalletProviderMetadata;
+  additionalOptions: Web3WalletProviderAdditionalOptions;
   networkConfig: NetworkConfig;
   provider: providers.Web3Provider;
   selectedAccount: string | undefined;
   selectedNetwork: providers.Network | undefined;
   signer: Signer;
   
-  constructor(metaData: WalletProviderMetadata) {
+  constructor(metaData: WalletProviderMetadata, additionalOptions: Web3WalletProviderAdditionalOptions) {
     this.metaData = metaData;
+    this.additionalOptions = additionalOptions;
 
     // set the method binding here
     this.assertIsConnected = this.assertIsConnected.bind(this);
@@ -286,17 +326,7 @@ class Web3Plugin {
 
     return {
       id: this.metaData.id,
-      meta: {
-        name: this.metaData.name,
-        shortName: this.metaData.shortName,
-        description: this.metaData.description,
-        isWalletInterface: this.metaData.isWalletInterface,
-        walletMetadata: {
-          name: this.metaData?.walletMetadata?.name,
-          shortName: this.metaData?.walletMetadata?.shortName,
-          description: this.metaData?.walletMetadata?.description
-        }
-      },
+      meta: cloneObjectWithoutSpecificKeys(this.metaData, ['id']),
       signatureProvider: this.makeSignatureProvider(),
       connect: this.connect,
       discover: this.discover,
@@ -312,7 +342,7 @@ class Web3Plugin {
    */
 
   /** Setup all event listeners here
-   * Each subclass must use this method to setup event listeners
+   * Each subClass must implement this method to setup event listeners
   */
   setupEventListeners() {
     // setup event listeners
