@@ -1,4 +1,5 @@
 import { providers } from 'ethers';
+import WalletConnectProvider from "@walletconnect/web3-provider";
 import Web3, {
   WalletProviderMetadata,
   Web3WalletProviderOptions,
@@ -8,7 +9,15 @@ import Web3, {
 
 declare const window: any;
 
-class Web3ProviderPlugin extends Web3 {
+// wallet connect config options
+const WALLET_CONNECT_INFURA_ID = '27e484dcd9e3efcfd25a83a78777cdf1';
+const WALLET_CONNECT_DISPLAY_QR_CODE = true;
+const WALLET_CONNECT_RPC_ENDPOINTS = {
+  1: "https://mainnet.infura.io/v3/4807102366a64a28b33e10d8751c9404",
+  3: "https://ropsten.infura.io/v3/4807102366a64a28b33e10d8751c9404",
+};
+
+class WalletConnectProviderPlugin extends Web3 {
 
   constructor(metaData: WalletProviderMetadata, additionalOptions: Web3WalletProviderAdditionalOptions) {
     super(metaData, additionalOptions);
@@ -23,8 +32,18 @@ class Web3ProviderPlugin extends Web3 {
   async connect(appName: string): Promise<boolean> {
     return new Promise(async (resolve, reject) => {
       try {
-        await window?.ethereum?.enable();
-        const res = await super.connect(appName, window.ethereum);
+
+        // initialize new wallet connect web3 provider
+        const walletConnectProvider = new WalletConnectProvider({
+          infuraId: WALLET_CONNECT_INFURA_ID, // Required
+          qrcode: WALLET_CONNECT_DISPLAY_QR_CODE,
+          rpc: WALLET_CONNECT_RPC_ENDPOINTS,
+        });
+
+        // display the QR code for user to connect using walletConnect
+        const displayQRCode = await walletConnectProvider.enable();
+
+        const res = await super.connect(appName, walletConnectProvider);
 
         // check if current selected network matches requested network, if not display network chenage popup
         await this.popupSelectDesiredNetworkIfNeeded(this.networkConfig);
@@ -93,14 +112,14 @@ class Web3ProviderPlugin extends Web3 {
 
 
 // initialize the class and return it
-const web3ProviderPlugin = (args: Web3WalletProviderOptions) => {
+const walletConnectProviderPlugin = (args: Web3WalletProviderOptions) => {
 
   // plugin meta data
   const metaData: WalletProviderMetadata = {
-    id: args?.id || 'web3',
-    name: args?.name || 'Web3 Web Wallet',
-    shortName: args?.shortName || 'Web3',
-    description: args?.description || 'Use Web3 Web Wallet to sign your Ethereum transactions',
+    id: args?.id || 'walletconnect',
+    name: args?.name || 'WalletConnect Wallet',
+    shortName: args?.shortName || 'WalletConnect',
+    description: args?.description || 'Use WalletConnect Wallet to sign your Ethereum transactions',
     isWalletInterface: true,
     walletMetadata: {
       name: 'unspecified',
@@ -115,10 +134,10 @@ const web3ProviderPlugin = (args: Web3WalletProviderOptions) => {
     network: args?.network,
   }
 
-  const plugin = new Web3ProviderPlugin(metaData, additionalOptions);
+  const plugin = new WalletConnectProviderPlugin(metaData, additionalOptions);
 
   // return the wallet provider
   return plugin.makeWalletProvider;
 };
 
-export default web3ProviderPlugin;
+export default walletConnectProviderPlugin;
