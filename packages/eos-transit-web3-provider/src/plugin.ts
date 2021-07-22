@@ -1,17 +1,17 @@
 import { providers } from 'ethers';
 import Web3, {
-  WalletProviderMetadata,
+  PluginMetaData,
   Web3WalletProviderOptions,
   Web3WalletProviderAdditionalOptions,
   isAString,
-} from './Web3';
+} from './EosTransitWeb3ProviderCore';
 
 declare const window: any;
 
 class Web3ProviderPlugin extends Web3 {
 
-  constructor(metaData: WalletProviderMetadata, additionalOptions: Web3WalletProviderAdditionalOptions) {
-    super(metaData, additionalOptions);
+  constructor(pluginMetaData: PluginMetaData, additionalOptions: Web3WalletProviderAdditionalOptions) {
+    super(pluginMetaData, additionalOptions);
 
     this.assertIsDesiredNetwork = this.assertIsDesiredNetwork.bind(this);
     this.getChainIdFromNetwork = this.getChainIdFromNetwork.bind(this);
@@ -96,7 +96,7 @@ class Web3ProviderPlugin extends Web3 {
 const web3ProviderPlugin = (args: Web3WalletProviderOptions) => {
 
   // plugin meta data
-  const metaData: WalletProviderMetadata = {
+  const pluginMetaData: PluginMetaData = {
     id: args?.id || 'web3',
     name: args?.name || 'Web3 Web Wallet',
     shortName: args?.shortName || 'Web3',
@@ -115,7 +115,7 @@ const web3ProviderPlugin = (args: Web3WalletProviderOptions) => {
     network: args?.network,
   }
 
-  const plugin = new Web3ProviderPlugin(metaData, additionalOptions);
+  const plugin = new Web3ProviderPlugin(pluginMetaData, additionalOptions);
 
   // return the wallet provider
   return plugin.makeWalletProvider;
