@@ -1,14 +1,20 @@
 import { providers } from 'ethers';
-import Web3, {
+import EosTransitWeb3ProviderCore, {
+  DiscoveryOptions,
+  DiscoverResponse,
+  isAString,
   PluginMetaData,
+  PushTransactionArgs,
+  SignatureProviderArgs,
+  WalletAuth,
+  WEB3_DEFAULT_PERMISSION,
   Web3WalletProviderOptions,
   Web3WalletProviderAdditionalOptions,
-  isAString,
 } from './EosTransitWeb3ProviderCore';
 
 declare const window: any;
 
-class Web3ProviderPlugin extends Web3 {
+class Web3ProviderPlugin extends EosTransitWeb3ProviderCore {
 
   constructor(pluginMetaData: PluginMetaData, additionalOptions: Web3WalletProviderAdditionalOptions) {
     super(pluginMetaData, additionalOptions);
@@ -35,6 +41,34 @@ class Web3ProviderPlugin extends Web3 {
     });
   }
 
+  async discover(discoveryOptions?: DiscoveryOptions): Promise<DiscoverResponse> {
+    return super.discover(discoveryOptions);
+  }
+
+  async disconnect(): Promise<boolean> {
+    return super.disconnect();
+  }
+
+  async login(accountName?: string, authorization: string = WEB3_DEFAULT_PERMISSION): Promise<WalletAuth> {
+    return super.login(accountName, authorization);
+  }
+
+  async logout(accountName?: string): Promise<boolean> {
+    return super.logout(accountName);
+  }
+
+  async signArbitrary(data: string, userMessage: string): Promise<string> {
+    return super.signArbitrary(data, userMessage);
+  }
+
+  async sign({ serializedTransaction, requiredKeys }: SignatureProviderArgs): Promise<PushTransactionArgs> {
+    return super.sign({ serializedTransaction, requiredKeys });
+  }
+
+  /** setup all event listeners here. We listen for events like
+   *  - network change
+   *  - accounts change
+   */
   setupEventListeners() {
     // setup network change listener
     this.provider.on('network', this.handleOnSelectNetwork);
@@ -93,7 +127,7 @@ class Web3ProviderPlugin extends Web3 {
 
 
 // initialize the class and return it
-const web3ProviderPlugin = (args: Web3WalletProviderOptions) => {
+const web3WalletProviderPlugin = (args: Web3WalletProviderOptions) => {
 
   // plugin meta data
   const pluginMetaData: PluginMetaData = {
@@ -117,8 +151,8 @@ const web3ProviderPlugin = (args: Web3WalletProviderOptions) => {
 
   const plugin = new Web3ProviderPlugin(pluginMetaData, additionalOptions);
 
-  // return the wallet provider
+  // return the wallet provider - This implements the eos-transit plugin interface
   return plugin.makeWalletProvider;
 };
 
-export default web3ProviderPlugin;
+export default web3WalletProviderPlugin;
