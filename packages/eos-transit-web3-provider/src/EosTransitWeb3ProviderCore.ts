@@ -132,10 +132,10 @@ export const WEB3_DEFAULT_PERMISSION = 'active';
  */
 abstract class EosTransitWeb3ProviderCore {
   accountToPublicKeyCache: { account: string; publicKey: string }[] = [];
+  additionalOptions: Web3WalletProviderAdditionalOptions;
   discoveredAccounts: WalletAuth[] = [];
   loggedInAccount: WalletAuth | undefined;
   pluginMetaData: PluginMetaData;
-  additionalOptions: Web3WalletProviderAdditionalOptions;
   networkConfig: NetworkConfig;
   provider: providers.Web3Provider;
   selectedAccount: string | undefined;
