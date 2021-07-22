@@ -1,11 +1,11 @@
 import { providers } from 'ethers';
 import WalletConnectProvider from "@walletconnect/web3-provider";
-import Web3, {
-  WalletProviderMetadata,
+import EosTransitWeb3ProviderCore, {
+  PluginMetaData,
   Web3WalletProviderOptions,
   Web3WalletProviderAdditionalOptions,
   isAString,
-} from './Web3';
+} from './EosTransitWeb3ProviderCore';
 
 declare const window: any;
 
@@ -17,9 +17,11 @@ const WALLET_CONNECT_RPC_ENDPOINTS = {
   3: "https://ropsten.infura.io/v3/4807102366a64a28b33e10d8751c9404",
 };
 
-class WalletConnectProviderPlugin extends Web3 {
+let walletConnectProvider: WalletConnectProvider;
 
-  constructor(metaData: WalletProviderMetadata, additionalOptions: Web3WalletProviderAdditionalOptions) {
+class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
+
+  constructor(metaData: PluginMetaData, additionalOptions: Web3WalletProviderAdditionalOptions) {
     super(metaData, additionalOptions);
 
     this.assertIsDesiredNetwork = this.assertIsDesiredNetwork.bind(this);
@@ -34,14 +36,15 @@ class WalletConnectProviderPlugin extends Web3 {
       try {
 
         // initialize new wallet connect web3 provider
-        const walletConnectProvider = new WalletConnectProvider({
+        walletConnectProvider = new WalletConnectProvider({
           infuraId: WALLET_CONNECT_INFURA_ID, // Required
           qrcode: WALLET_CONNECT_DISPLAY_QR_CODE,
           rpc: WALLET_CONNECT_RPC_ENDPOINTS,
         });
 
         // display the QR code for user to connect using walletConnect
-        const displayQRCode = await walletConnectProvider.enable();
+        await walletConnectProvider.enable();
+        console.log('walletConnectProvider', walletConnectProvider)
 
         const res = await super.connect(appName, walletConnectProvider);
 
@@ -54,22 +57,35 @@ class WalletConnectProviderPlugin extends Web3 {
     });
   }
 
+  // async sign() {
+  //   super.sign();
+  // }
+
+  async disconnect(): Promise<boolean> {
+    return new Promise(async (resolve, reject) => {
+      await walletConnectProvider.disconnect();  
+      resolve(true);
+    });
+  }
+
   setupEventListeners() {
     // setup network change listener
-    this.provider.on('network', this.handleOnSelectNetwork);
+    this.provider.on('chainChanged', this.handleOnSelectNetwork);
 
     // setup account change listener
-    window?.ethereum?.on('accountsChanged', this.handleOnSelectAccount);
+    // window?.ethereum?.on('accountsChanged', this.handleOnSelectAccount);
   }
 
   /** Handle network change event */
   handleOnSelectNetwork(network: providers.Network, oldNetwork: providers.Network): void {
+    console.log('handleOnSelectNetwork', network)
     this.selectedNetwork = network;
     this.discover();
   }
 
   /** Handle account change event */
   handleOnSelectAccount(accounts: string[]) {
+    console.log('handleOnSelectAccount', accounts)
     const account = accounts?.length > 0 ? accounts[0] : undefined;
     this.selectedAccount = account;
     this.discover();
@@ -115,7 +131,7 @@ class WalletConnectProviderPlugin extends Web3 {
 const walletConnectProviderPlugin = (args: Web3WalletProviderOptions) => {
 
   // plugin meta data
-  const metaData: WalletProviderMetadata = {
+  const pluginMetaData: PluginMetaData = {
     id: args?.id || 'walletconnect',
     name: args?.name || 'WalletConnect Wallet',
     shortName: args?.shortName || 'WalletConnect',
@@ -134,7 +150,7 @@ const walletConnectProviderPlugin = (args: Web3WalletProviderOptions) => {
     network: args?.network,
   }
 
-  const plugin = new WalletConnectProviderPlugin(metaData, additionalOptions);
+  const plugin = new WalletConnectProviderPlugin(pluginMetaData, additionalOptions);
 
   // return the wallet provider
   return plugin.makeWalletProvider;
