@@ -67,11 +67,23 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-var Web3_1 = __importStar(require("./Web3"));
-var Web3ProviderPlugin = /** @class */ (function (_super) {
-    __extends(Web3ProviderPlugin, _super);
-    function Web3ProviderPlugin(metaData, additionalOptions) {
+var web3_provider_1 = __importDefault(require("@walletconnect/web3-provider"));
+var EosTransitWeb3ProviderCore_1 = __importStar(require("./EosTransitWeb3ProviderCore"));
+// wallet connect config options
+var WALLET_CONNECT_INFURA_ID = '27e484dcd9e3efcfd25a83a78777cdf1';
+var WALLET_CONNECT_DISPLAY_QR_CODE = true;
+var WALLET_CONNECT_RPC_ENDPOINTS = {
+    1: "https://mainnet.infura.io/v3/4807102366a64a28b33e10d8751c9404",
+    3: "https://ropsten.infura.io/v3/4807102366a64a28b33e10d8751c9404",
+};
+var walletConnectProvider;
+var WalletConnectProviderPlugin = /** @class */ (function (_super) {
+    __extends(WalletConnectProviderPlugin, _super);
+    function WalletConnectProviderPlugin(metaData, additionalOptions) {
         var _this = _super.call(this, metaData, additionalOptions) || this;
         _this.assertIsDesiredNetwork = _this.assertIsDesiredNetwork.bind(_this);
         _this.getChainIdFromNetwork = _this.getChainIdFromNetwork.bind(_this);
@@ -80,32 +92,40 @@ var Web3ProviderPlugin = /** @class */ (function (_super) {
         _this.popupSelectDesiredNetworkIfNeeded = _this.popupSelectDesiredNetworkIfNeeded.bind(_this);
         return _this;
     }
-    Web3ProviderPlugin.prototype.connect = function (appName) {
+    WalletConnectProviderPlugin.prototype.connect = function (appName) {
         return __awaiter(this, void 0, void 0, function () {
             var _this = this;
             return __generator(this, function (_a) {
                 return [2 /*return*/, new Promise(function (resolve, reject) { return __awaiter(_this, void 0, void 0, function () {
                         var res, error_1;
-                        var _a;
-                        return __generator(this, function (_b) {
-                            switch (_b.label) {
+                        return __generator(this, function (_a) {
+                            switch (_a.label) {
                                 case 0:
-                                    _b.trys.push([0, 4, , 5]);
-                                    return [4 /*yield*/, ((_a = window === null || window === void 0 ? void 0 : window.ethereum) === null || _a === void 0 ? void 0 : _a.enable())];
+                                    _a.trys.push([0, 4, , 5]);
+                                    // initialize new wallet connect web3 provider
+                                    walletConnectProvider = new web3_provider_1.default({
+                                        infuraId: WALLET_CONNECT_INFURA_ID,
+                                        qrcode: WALLET_CONNECT_DISPLAY_QR_CODE,
+                                        rpc: WALLET_CONNECT_RPC_ENDPOINTS,
+                                    });
+                                    // display the QR code for user to connect using walletConnect
+                                    return [4 /*yield*/, walletConnectProvider.enable()];
                                 case 1:
-                                    _b.sent();
-                                    return [4 /*yield*/, _super.prototype.connect.call(this, appName, window.ethereum)];
+                                    // display the QR code for user to connect using walletConnect
+                                    _a.sent();
+                                    console.log('walletConnectProvider', walletConnectProvider);
+                                    return [4 /*yield*/, _super.prototype.connect.call(this, appName, walletConnectProvider)];
                                 case 2:
-                                    res = _b.sent();
+                                    res = _a.sent();
                                     // check if current selected network matches requested network, if not display network chenage popup
                                     return [4 /*yield*/, this.popupSelectDesiredNetworkIfNeeded(this.networkConfig)];
                                 case 3:
                                     // check if current selected network matches requested network, if not display network chenage popup
-                                    _b.sent();
+                                    _a.sent();
                                     resolve(res);
                                     return [3 /*break*/, 5];
                                 case 4:
-                                    error_1 = _b.sent();
+                                    error_1 = _a.sent();
                                     reject(error_1);
                                     return [3 /*break*/, 5];
                                 case 5: return [2 /*return*/];
@@ -115,26 +135,48 @@ var Web3ProviderPlugin = /** @class */ (function (_super) {
             });
         });
     };
-    Web3ProviderPlugin.prototype.setupEventListeners = function () {
-        var _a;
+    // async sign() {
+    //   super.sign();
+    // }
+    WalletConnectProviderPlugin.prototype.disconnect = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var _this = this;
+            return __generator(this, function (_a) {
+                return [2 /*return*/, new Promise(function (resolve, reject) { return __awaiter(_this, void 0, void 0, function () {
+                        return __generator(this, function (_a) {
+                            switch (_a.label) {
+                                case 0: return [4 /*yield*/, walletConnectProvider.disconnect()];
+                                case 1:
+                                    _a.sent();
+                                    resolve(true);
+                                    return [2 /*return*/];
+                            }
+                        });
+                    }); })];
+            });
+        });
+    };
+    WalletConnectProviderPlugin.prototype.setupEventListeners = function () {
         // setup network change listener
-        this.provider.on('network', this.handleOnSelectNetwork);
+        this.provider.on('chainChanged', this.handleOnSelectNetwork);
         // setup account change listener
-        (_a = window === null || window === void 0 ? void 0 : window.ethereum) === null || _a === void 0 ? void 0 : _a.on('accountsChanged', this.handleOnSelectAccount);
+        // window?.ethereum?.on('accountsChanged', this.handleOnSelectAccount);
     };
     /** Handle network change event */
-    Web3ProviderPlugin.prototype.handleOnSelectNetwork = function (network, oldNetwork) {
+    WalletConnectProviderPlugin.prototype.handleOnSelectNetwork = function (network, oldNetwork) {
+        console.log('handleOnSelectNetwork', network);
         this.selectedNetwork = network;
         this.discover();
     };
     /** Handle account change event */
-    Web3ProviderPlugin.prototype.handleOnSelectAccount = function (accounts) {
+    WalletConnectProviderPlugin.prototype.handleOnSelectAccount = function (accounts) {
+        console.log('handleOnSelectAccount', accounts);
         var account = (accounts === null || accounts === void 0 ? void 0 : accounts.length) > 0 ? accounts[0] : undefined;
         this.selectedAccount = account;
         this.discover();
     };
     /** if requiredNetwork is not already selected in the wallet, trigger the wallet to prmompt the user to select the network */
-    Web3ProviderPlugin.prototype.popupSelectDesiredNetworkIfNeeded = function (requiredNetwork) {
+    WalletConnectProviderPlugin.prototype.popupSelectDesiredNetworkIfNeeded = function (requiredNetwork) {
         var _a;
         return __awaiter(this, void 0, void 0, function () {
             var _b, chainIdInt, chainIdHex, _c;
@@ -164,14 +206,14 @@ var Web3ProviderPlugin = /** @class */ (function (_super) {
         });
     };
     /** convert network chainId to int if needed */
-    Web3ProviderPlugin.prototype.getChainIdFromNetwork = function (network) {
+    WalletConnectProviderPlugin.prototype.getChainIdFromNetwork = function (network) {
         var chainId = network.chainId;
-        var chainIdInt = Web3_1.isAString(chainId) ? parseInt(chainId) : chainId;
+        var chainIdInt = EosTransitWeb3ProviderCore_1.isAString(chainId) ? parseInt(chainId) : chainId;
         var chainIdHex = "0x" + chainIdInt;
         return { chainIdInt: chainIdInt, chainIdHex: chainIdHex };
     };
     /** reject if requiredNetwork is not already selected in the wallet */
-    Web3ProviderPlugin.prototype.assertIsDesiredNetwork = function (requiredNetwork) {
+    WalletConnectProviderPlugin.prototype.assertIsDesiredNetwork = function (requiredNetwork) {
         var _a;
         var chainIdInt = this.getChainIdFromNetwork(requiredNetwork).chainIdInt;
         if (((_a = this.selectedNetwork) === null || _a === void 0 ? void 0 : _a.chainId) !== chainIdInt) {
@@ -179,16 +221,16 @@ var Web3ProviderPlugin = /** @class */ (function (_super) {
             throw new Error(errMsg);
         }
     };
-    return Web3ProviderPlugin;
-}(Web3_1.default));
+    return WalletConnectProviderPlugin;
+}(EosTransitWeb3ProviderCore_1.default));
 // initialize the class and return it
-var web3ProviderPlugin = function (args) {
+var walletConnectProviderPlugin = function (args) {
     // plugin meta data
-    var metaData = {
-        id: (args === null || args === void 0 ? void 0 : args.id) || 'web3',
-        name: (args === null || args === void 0 ? void 0 : args.name) || 'Web3 Web Wallet',
-        shortName: (args === null || args === void 0 ? void 0 : args.shortName) || 'Web3',
-        description: (args === null || args === void 0 ? void 0 : args.description) || 'Use Web3 Web Wallet to sign your Ethereum transactions',
+    var pluginMetaData = {
+        id: (args === null || args === void 0 ? void 0 : args.id) || 'walletconnect',
+        name: (args === null || args === void 0 ? void 0 : args.name) || 'WalletConnect Wallet',
+        shortName: (args === null || args === void 0 ? void 0 : args.shortName) || 'WalletConnect',
+        description: (args === null || args === void 0 ? void 0 : args.description) || 'Use WalletConnect Wallet to sign your Ethereum transactions',
         isWalletInterface: true,
         walletMetadata: {
             name: 'unspecified',
@@ -201,9 +243,9 @@ var web3ProviderPlugin = function (args) {
         errorTimeout: args === null || args === void 0 ? void 0 : args.errorTimeout,
         network: args === null || args === void 0 ? void 0 : args.network,
     };
-    var plugin = new Web3ProviderPlugin(metaData, additionalOptions);
+    var plugin = new WalletConnectProviderPlugin(pluginMetaData, additionalOptions);
     // return the wallet provider
     return plugin.makeWalletProvider;
 };
-exports.default = web3ProviderPlugin;
+exports.default = walletConnectProviderPlugin;
 //# sourceMappingURL=plugin.js.map

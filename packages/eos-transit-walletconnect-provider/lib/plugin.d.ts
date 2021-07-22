@@ -1,3 +1,3 @@
-import { Web3WalletProviderOptions } from './Web3';
-declare const web3ProviderPlugin: (args: Web3WalletProviderOptions) => (network: import("./Web3").NetworkConfig) => import("./Web3").WalletProvider;
-export default web3ProviderPlugin;
+import { Web3WalletProviderOptions } from './EosTransitWeb3ProviderCore';
+declare const walletConnectProviderPlugin: (args: Web3WalletProviderOptions) => (network: import("./EosTransitWeb3ProviderCore").NetworkConfig) => import("./EosTransitWeb3ProviderCore").WalletProvider;
+export default walletConnectProviderPlugin;
