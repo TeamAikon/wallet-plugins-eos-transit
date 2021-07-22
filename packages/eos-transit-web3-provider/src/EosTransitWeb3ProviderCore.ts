@@ -1,3 +1,12 @@
+/******************************************************************************************************
+ * WARNING:
+ * If you make any changes here, This exact file needs to be copied to both the plugins directory
+ * Plugins using this file:
+ *  eos-transit-web3-provider
+ *  eos-transit-walletconnect-provider
+ * makeWalletProvider method implements the eos plugin interface
+ ******************************************************************************************************/
+
 import { ethers, providers, Signer } from 'ethers';
 import { decode, encode } from '@msgpack/msgpack';
 
@@ -37,6 +46,8 @@ export type NetworkConfig = {
   chainId: string;
 }
 
+export type PluginMetaData = WalletProviderMetadata & { id: string; }
+
 export type PushTransactionArgs = {
   signatures: string[];
   serializedTransaction: Uint8Array;
@@ -53,6 +64,7 @@ export type SignatureProviderArgs = {
   serializedTransaction: Uint8Array;
   requiredKeys: string[];
 }
+
 
 export interface WalletProvider {
   id?: string;
@@ -78,7 +90,6 @@ export type WalletAuth = {
 }
 
 export type WalletProviderMetadata = {
-  id?: string,
   name?: string;
   shortName?: string;
   description?: string;
@@ -112,29 +123,18 @@ export function isAString(value: any): boolean {
   return typeof value === 'string' || value instanceof String
 }
 
-/** Clone and return a new object without given keys */
-export function cloneObjectWithoutSpecificKeys(originalObject: Object, keysToRemove: string[]) {
-  let newObject = Object.assign({}, originalObject);
-  if ( keysToRemove && keysToRemove.length > 0 ) {
-    keysToRemove.map( key => {
-      if ( newObject[key] ) { delete newObject[key]; }
-    });
-  }
-  return newObject;
-}
-
 export const WEB3_DEFAULT_PERMISSION = 'active';
 
 
 /**
- * Web3 plugin class, This contains all the common methods for all Web3 providers.
- * this supports browser based extensions and walletConnect
+ * This is an Abstract class which implements most of Eos Transit Web3 Provider functionalities
+ * This class should be extended for each plugin that uses Web3 functionality.
  */
-class Web3Plugin {
+abstract class EosTransitWeb3ProviderCore {
   accountToPublicKeyCache: { account: string; publicKey: string }[] = [];
   discoveredAccounts: WalletAuth[] = [];
   loggedInAccount: WalletAuth | undefined;
-  metaData: WalletProviderMetadata;
+  pluginMetaData: PluginMetaData;
   additionalOptions: Web3WalletProviderAdditionalOptions;
   networkConfig: NetworkConfig;
   provider: providers.Web3Provider;
@@ -142,8 +142,8 @@ class Web3Plugin {
   selectedNetwork: providers.Network | undefined;
   signer: Signer;
   
-  constructor(metaData: WalletProviderMetadata, additionalOptions: Web3WalletProviderAdditionalOptions) {
-    this.metaData = metaData;
+  constructor(pluginMetaData: PluginMetaData, additionalOptions: Web3WalletProviderAdditionalOptions) {
+    this.pluginMetaData = pluginMetaData;
     this.additionalOptions = additionalOptions;
 
     // set the method binding here
@@ -160,11 +160,11 @@ class Web3Plugin {
   }
 
   /** Connect with the given provider and return boolen response. */
-  connect(appName: string, web3Provider: providers.ExternalProvider): Promise<boolean> {
+  connect(appName: string, externalProvider: providers.ExternalProvider): Promise<boolean> {
     return new Promise(async (resolve, reject) => {
       try {
         // create a new instance of ethers js using web3 provider
-        this.provider = new ethers.providers.Web3Provider(web3Provider, 'any');
+        this.provider = new ethers.providers.Web3Provider(externalProvider, 'any');
         // set the signer
         this.signer = this.provider.getSigner(); // get the signer from provider
 
@@ -175,7 +175,7 @@ class Web3Plugin {
         if (this.provider) {
           resolve(true);
         } else {
-          reject(`${this.metaData.id}: Connect error`);
+          reject(`${this.pluginMetaData.id}: Connect error`);
         }
       } catch (error) {
         reject(error);
@@ -320,13 +320,14 @@ class Web3Plugin {
     }
   }
 
-  /** This contains all the methods required and used by the eos-transit plugin */
+  /** This methods implements the Eos Transit plugin interface */
   makeWalletProvider(network: NetworkConfig): WalletProvider {
     this.networkConfig = network;
+    const { id, ...walletMetaData } = this.pluginMetaData;
 
     return {
-      id: this.metaData.id,
-      meta: cloneObjectWithoutSpecificKeys(this.metaData, ['id']),
+      id: this.pluginMetaData.id,
+      meta: (walletMetaData as WalletProviderMetadata),
       signatureProvider: this.makeSignatureProvider(),
       connect: this.connect,
       discover: this.discover,
@@ -424,10 +425,10 @@ class Web3Plugin {
   /** Web3 provider doesn't support discovering keys from the wallet. */
   private async getAvailableKeys(): Promise<string[]> {
     return new Promise((resolve, reject) => {
-      reject(`${this.metaData.id}: getAvailableKeys is not supported`);
+      reject(`${this.pluginMetaData.id}: getAvailableKeys is not supported`);
     });
   }
 
 }
 
-export default Web3Plugin;
+export default EosTransitWeb3ProviderCore;
