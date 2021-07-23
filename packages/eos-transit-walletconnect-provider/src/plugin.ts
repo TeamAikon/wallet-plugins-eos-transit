@@ -37,7 +37,6 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
     this.getChainIdFromNetwork = this.getChainIdFromNetwork.bind(this);
     this.handleOnSelectAccount = this.handleOnSelectAccount.bind(this);
     this.handleOnSelectNetwork = this.handleOnSelectNetwork.bind(this);
-    this.popupSelectDesiredNetworkIfNeeded = this.popupSelectDesiredNetworkIfNeeded.bind(this);
   }
 
   async connect(appName: string): Promise<boolean> {
@@ -56,8 +55,6 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
 
         const res = await super.connect(appName, walletConnectProvider);
 
-        // check if current selected network matches requested network, if not display network chenage popup
-        // await this.popupSelectDesiredNetworkIfNeeded(this.networkConfig);
         resolve(res);
       } catch (error) {
         reject(error);
@@ -134,43 +131,15 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
    */
   setupEventListeners() {
     // setup network change listener
-    this.provider.on('network', this.handleOnSelectNetwork);
-
     // setup account change listener
-    window?.ethereum?.on('accountsChanged', this.handleOnSelectAccount);
   }
 
   /** Handle network change event */
   handleOnSelectNetwork(network: providers.Network, oldNetwork: providers.Network): void {
-    this.selectedNetwork = network;
-    this.discover();
   }
 
   /** Handle account change event */
   handleOnSelectAccount(accounts: string[]) {
-    const account = accounts?.length > 0 ? accounts[0] : undefined;
-    this.selectedAccount = account;
-    this.discover();
-  }
-
-  /** if requiredNetwork is not already selected in the wallet, trigger the wallet to prmompt the user to select the network */
-  async popupSelectDesiredNetworkIfNeeded(requiredNetwork: any & { chainId: number | string }): Promise<void> {
-    const { chainIdInt, chainIdHex } = this.getChainIdFromNetwork(requiredNetwork);
-    if (this.selectedNetwork?.chainId === chainIdInt) return;
-
-    // not all wallets implement the wallet_switchEthereumChain method - this is optional
-    try {
-      // propmt the user to select the correct network
-      await window?.ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: chainIdHex }]
-      });
-      this.selectedNetwork = await this.provider.getNetwork();
-      // if desired network not selected, throw
-      this.assertIsDesiredNetwork(requiredNetwork);
-    } catch(error) {
-      console.log('popupSelectDesiredNetworkIfNeeded::error', error);
-    }
   }
 
   /** convert network chainId to int if needed */
