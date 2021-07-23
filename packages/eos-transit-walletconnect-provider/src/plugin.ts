@@ -1,10 +1,19 @@
 import { providers } from 'ethers';
 import WalletConnectProvider from "@walletconnect/web3-provider";
 import EosTransitWeb3ProviderCore, {
-  PluginMetaData,
-  Web3WalletProviderOptions,
-  Web3WalletProviderAdditionalOptions,
+  DiscoveryOptions,
+  DiscoverResponse,
   isAString,
+  NetworkConfig,
+  PluginMetaData,
+  PushTransactionArgs,
+  SignatureProvider,
+  SignatureProviderArgs,
+  WalletAuth,
+  WalletProvider,
+  WEB3_DEFAULT_PERMISSION,
+  Web3WalletProviderAdditionalOptions,
+  Web3WalletProviderOptions,
 } from './EosTransitWeb3ProviderCore';
 
 declare const window: any;
@@ -21,8 +30,8 @@ let walletConnectProvider: WalletConnectProvider;
 
 class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
 
-  constructor(metaData: PluginMetaData, additionalOptions: Web3WalletProviderAdditionalOptions) {
-    super(metaData, additionalOptions);
+  constructor(pluginMetaData: PluginMetaData, additionalOptions: Web3WalletProviderAdditionalOptions) {
+    super(pluginMetaData, additionalOptions);
 
     this.assertIsDesiredNetwork = this.assertIsDesiredNetwork.bind(this);
     this.getChainIdFromNetwork = this.getChainIdFromNetwork.bind(this);
@@ -44,12 +53,11 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
 
         // display the QR code for user to connect using walletConnect
         await walletConnectProvider.enable();
-        console.log('walletConnectProvider', walletConnectProvider)
 
         const res = await super.connect(appName, walletConnectProvider);
 
         // check if current selected network matches requested network, if not display network chenage popup
-        await this.popupSelectDesiredNetworkIfNeeded(this.networkConfig);
+        // await this.popupSelectDesiredNetworkIfNeeded(this.networkConfig);
         resolve(res);
       } catch (error) {
         reject(error);
@@ -57,9 +65,9 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
     });
   }
 
-  // async sign() {
-  //   super.sign();
-  // }
+  async discover(discoveryOptions?: DiscoveryOptions): Promise<DiscoverResponse> {
+    return super.discover(discoveryOptions);
+  }
 
   async disconnect(): Promise<boolean> {
     return new Promise(async (resolve, reject) => {
@@ -68,24 +76,78 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
     });
   }
 
+  async login(accountName?: string, authorization: string = WEB3_DEFAULT_PERMISSION): Promise<WalletAuth> {
+    return super.login(accountName, authorization);
+  }
+
+  async logout(accountName?: string): Promise<boolean> {
+    return super.logout(accountName);
+  }
+
+  async signArbitrary(data: string, userMessage: string): Promise<string> {
+    return super.signArbitrary(data, userMessage);
+  }
+
+  async sign({ serializedTransaction, requiredKeys }: SignatureProviderArgs): Promise<PushTransactionArgs> {
+    return super.sign({ serializedTransaction, requiredKeys });
+  }
+
+  makeSignatureProvider(): SignatureProvider {
+    return super.makeSignatureProvider();
+  }
+
+  makeWalletProvider(network: NetworkConfig): WalletProvider {
+    return super.makeWalletProvider(network);
+  }
+
+  addToAccountToPublicKeyMap(account: string, publicKey: string) {
+    return super.addToAccountToPublicKeyMap(account, publicKey);
+  }
+
+  assertIsConnected(reject: any): void {
+    return super.assertIsConnected(reject);
+  }
+
+  composeKeyToAccountMap(accounts: string[]) {
+    return super.composeKeyToAccountMap(accounts);
+  }
+
+  async getAvailableKeys(): Promise<string[]> {
+    return super.getAvailableKeys();
+  }
+
+  getCurrentWalletProvider() {
+    return super.getCurrentWalletProvider();
+  }
+
+  getPublicKeyFromSignedHash(messageHash: string, signature: string): string {
+    return super.getPublicKeyFromSignedHash(messageHash, signature);
+  }
+
+  mapTransactionResponseToTransaction(transactionResponse: providers.TransactionResponse) {
+    return super.mapTransactionResponseToTransaction(transactionResponse);
+  }
+
+  /** setup all event listeners here. We listen for events like
+   *  - network change
+   *  - accounts change
+   */
   setupEventListeners() {
     // setup network change listener
-    this.provider.on('chainChanged', this.handleOnSelectNetwork);
+    this.provider.on('network', this.handleOnSelectNetwork);
 
     // setup account change listener
-    // window?.ethereum?.on('accountsChanged', this.handleOnSelectAccount);
+    window?.ethereum?.on('accountsChanged', this.handleOnSelectAccount);
   }
 
   /** Handle network change event */
   handleOnSelectNetwork(network: providers.Network, oldNetwork: providers.Network): void {
-    console.log('handleOnSelectNetwork', network)
     this.selectedNetwork = network;
     this.discover();
   }
 
   /** Handle account change event */
   handleOnSelectAccount(accounts: string[]) {
-    console.log('handleOnSelectAccount', accounts)
     const account = accounts?.length > 0 ? accounts[0] : undefined;
     this.selectedAccount = account;
     this.discover();
@@ -95,14 +157,20 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
   async popupSelectDesiredNetworkIfNeeded(requiredNetwork: any & { chainId: number | string }): Promise<void> {
     const { chainIdInt, chainIdHex } = this.getChainIdFromNetwork(requiredNetwork);
     if (this.selectedNetwork?.chainId === chainIdInt) return;
-    // propmt the user to select the correct network
-    await window?.ethereum.request({
-      method: 'wallet_switchEthereumChain',
-      params: [{ chainId: chainIdHex }]
-    });
-    this.selectedNetwork = await this.provider.getNetwork();
-    // if desired network not selected, throw
-    this.assertIsDesiredNetwork(requiredNetwork);
+
+    // not all wallets implement the wallet_switchEthereumChain method - this is optional
+    try {
+      // propmt the user to select the correct network
+      await window?.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: chainIdHex }]
+      });
+      this.selectedNetwork = await this.provider.getNetwork();
+      // if desired network not selected, throw
+      this.assertIsDesiredNetwork(requiredNetwork);
+    } catch(error) {
+      console.log('popupSelectDesiredNetworkIfNeeded::error', error);
+    }
   }
 
   /** convert network chainId to int if needed */
@@ -111,6 +179,12 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
     const chainIdInt = isAString(chainId) ? parseInt(chainId) : chainId;
     const chainIdHex = `0x${chainIdInt}`;
     return { chainIdInt, chainIdHex };
+  }
+
+  /** Get the current wallet provider name */
+  getCurrentWalletProviderName(): string {
+    let providerName: string = 'unspecified';
+    return providerName;
   }
 
   /** reject if requiredNetwork is not already selected in the wallet */
@@ -138,6 +212,7 @@ const walletConnectProviderPlugin = (args: Web3WalletProviderOptions) => {
     description: args?.description || 'Use WalletConnect Wallet to sign your Ethereum transactions',
     isWalletInterface: true,
     walletMetadata: {
+      id: 'unspecified',
       name: 'unspecified',
       shortName: 'unspecified',
       description: 'unspecified'
@@ -152,7 +227,7 @@ const walletConnectProviderPlugin = (args: Web3WalletProviderOptions) => {
 
   const plugin = new WalletConnectProviderPlugin(pluginMetaData, additionalOptions);
 
-  // return the wallet provider
+  // return the wallet provider - This implements the eos-transit plugin interface
   return plugin.makeWalletProvider;
 };
 
