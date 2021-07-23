@@ -350,20 +350,20 @@ abstract class EosTransitWeb3ProviderCore {
    */
 
   /** Add a newly used public key so that it can show up next time discover is called */
-  private addToAccountToPublicKeyMap(account: string, publicKey: string) {
+  addToAccountToPublicKeyMap(account: string, publicKey: string) {
     const newKey = { account, publicKey };
     this.accountToPublicKeyCache.push(newKey);  
   }
 
   /** Check if the provider exists or not. If not throw */
-  private assertIsConnected(reject: any): void {
+  assertIsConnected(reject: any): void {
     if (!this.provider) {
       reject('Not connected. Call connect() before using this function');
     }
   }
 
   /** Compose a map between public keys and the accounts/permission used by each one */
-  private composeKeyToAccountMap(accounts: string[]) {
+  composeKeyToAccountMap(accounts: string[]) {
     const accountMap: DiscoveryAccount[] = accounts?.map((account, index) => {
       const publicKey = this.accountToPublicKeyCache.find(
         a => a.account === account
@@ -385,7 +385,7 @@ abstract class EosTransitWeb3ProviderCore {
   }
 
   /** Web3 provider doesn't support discovering keys from the wallet. */
-  private async getAvailableKeys(): Promise<string[]> {
+  async getAvailableKeys(): Promise<string[]> {
     return new Promise((resolve, reject) => {
       reject(`${this.pluginMetaData.id}: getAvailableKeys is not supported`);
     });
@@ -410,14 +410,14 @@ abstract class EosTransitWeb3ProviderCore {
   }
 
   /** Extract a public key using the transaction/message hash and signature */
-  private getPublicKeyFromSignedHash(messageHash: string, signature: string): string {
+  getPublicKeyFromSignedHash(messageHash: string, signature: string): string {
     const msgHashBytes = ethers.utils.arrayify(messageHash);
     let publicKey = ethers.utils.recoverPublicKey(msgHashBytes, signature);
     return publicKey;  
   }
 
   /** Extract the raw transaction from sign response (remove unnecessary fields) */
-  private mapTransactionResponseToTransaction(transactionResponse: ethers.providers.TransactionResponse) {
+  mapTransactionResponseToTransaction(transactionResponse: providers.TransactionResponse) {
     const {
       to,
       from,
@@ -450,7 +450,7 @@ abstract class EosTransitWeb3ProviderCore {
   /** Setup all event listeners here
    * Each subClass must implement this method to setup event listeners
   */
-   setupEventListeners() {
+  setupEventListeners() {
     // setup event listeners
   }
 
