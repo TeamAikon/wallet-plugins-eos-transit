@@ -150,6 +150,7 @@ abstract class EosTransitWeb3ProviderCore {
     this.connect = this.connect.bind(this);
     this.discover = this.discover.bind(this);
     this.getAvailableKeys = this.getAvailableKeys.bind(this);
+    this.getCurrentWalletProvider = this.getCurrentWalletProvider.bind(this);
     this.login = this.login.bind(this);
     this.makeSignatureProvider = this.makeSignatureProvider.bind(this);
     this.makeWalletProvider = this.makeWalletProvider.bind(this);
@@ -164,11 +165,18 @@ abstract class EosTransitWeb3ProviderCore {
       try {
         // create a new instance of ethers js using web3 provider
         this.provider = new ethers.providers.Web3Provider(externalProvider, 'any');
+
         // set the signer
         this.signer = this.provider.getSigner(); // get the signer from provider
 
+        // get the current network from the provider
+        this.selectedNetwork = await this.provider.getNetwork();
+
         // setup the event listeners here.
         this.setupEventListeners();
+
+        // get the current wallet provider meta data, ex: metamask, walletconnect, etc
+        this.getCurrentWalletProvider();
 
         // return the response
         if (this.provider) {
@@ -381,6 +389,24 @@ abstract class EosTransitWeb3ProviderCore {
     return new Promise((resolve, reject) => {
       reject(`${this.pluginMetaData.id}: getAvailableKeys is not supported`);
     });
+  }
+
+  /** Get the current wallet provider metaData
+   * Each plugin must implement this method for getting the current provider details
+  */
+  getCurrentWalletProvider(): void {
+    const walletProvider = this.getCurrentWalletProviderName();
+    this.pluginMetaData.walletMetadata = {
+      ...this.pluginMetaData.walletMetadata,
+      id: walletProvider,
+      name: walletProvider,
+      shortName: walletProvider,
+    }
+  }
+
+  /** Get the current wallet provider name - each plugin must implement this method */
+  getCurrentWalletProviderName(): string {
+    return 'unspecified';
   }
 
   /** Extract a public key using the transaction/message hash and signature */
