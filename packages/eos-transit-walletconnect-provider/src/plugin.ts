@@ -153,6 +153,15 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
   /** Get the current wallet provider name */
   getCurrentWalletProviderName(): string {
     let providerName: string = 'unspecified';
+
+    try {
+      if (walletConnectProvider?.wc?.peerMeta?.name) {
+        providerName = walletConnectProvider.wc.peerMeta.name;
+      }
+    } catch (error) {
+      console.log('getCurrentWalletProviderName::error', error);
+    }
+
     return providerName;
   }
 
