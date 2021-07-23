@@ -9,7 +9,6 @@
 
 import { ethers, providers, Signer } from 'ethers';
 import { decode, encode } from '@msgpack/msgpack';
-import WalletConnectProvider from "@walletconnect/web3-provider";
 
 /** all Types used within Web3Plugin Class */
 
@@ -66,7 +65,11 @@ export type SignatureProviderArgs = {
   requiredKeys: string[];
 }
 
-
+export type WalletAuth = {
+  accountName: string;
+  permission: string;
+  publicKey?: string;
+}
 export interface WalletProvider {
   id?: string;
   meta?: WalletProviderMetadata;
@@ -84,18 +87,13 @@ export interface WalletProvider {
   signArbitrary(data: string, userMessage: string): Promise<string>;
 }
 
-export type WalletAuth = {
-  accountName: string;
-  permission: string;
-  publicKey?: string;
-}
-
 export type WalletProviderMetadata = {
   name?: string;
   shortName?: string;
   description?: string;
   isWalletInterface?: boolean;
   walletMetadata?: {
+    id?: string;
     name?: string;
     shortName?: string;
     description?: string;
@@ -133,11 +131,11 @@ export const WEB3_DEFAULT_PERMISSION = 'active';
  */
 abstract class EosTransitWeb3ProviderCore {
   accountToPublicKeyCache: { account: string; publicKey: string }[] = [];
+  additionalOptions: Web3WalletProviderAdditionalOptions;
   discoveredAccounts: WalletAuth[] = [];
   loggedInAccount: WalletAuth | undefined;
-  pluginMetaData: PluginMetaData;
-  additionalOptions: Web3WalletProviderAdditionalOptions;
   networkConfig: NetworkConfig;
+  pluginMetaData: PluginMetaData;
   provider: providers.Web3Provider;
   selectedAccount: string | undefined;
   selectedNetwork: providers.Network | undefined;
@@ -152,6 +150,7 @@ abstract class EosTransitWeb3ProviderCore {
     this.connect = this.connect.bind(this);
     this.discover = this.discover.bind(this);
     this.getAvailableKeys = this.getAvailableKeys.bind(this);
+    this.getCurrentWalletProvider = this.getCurrentWalletProvider.bind(this);
     this.login = this.login.bind(this);
     this.makeSignatureProvider = this.makeSignatureProvider.bind(this);
     this.makeWalletProvider = this.makeWalletProvider.bind(this);
@@ -166,11 +165,18 @@ abstract class EosTransitWeb3ProviderCore {
       try {
         // create a new instance of ethers js using web3 provider
         this.provider = new ethers.providers.Web3Provider(externalProvider, 'any');
+
         // set the signer
         this.signer = this.provider.getSigner(); // get the signer from provider
 
+        // get the current network from the provider
+        this.selectedNetwork = await this.provider.getNetwork();
+
         // setup the event listeners here.
         this.setupEventListeners();
+
+        // get the current wallet provider meta data, ex: metamask, walletconnect, etc
+        this.getCurrentWalletProvider();
 
         // return the response
         if (this.provider) {
@@ -343,15 +349,21 @@ abstract class EosTransitWeb3ProviderCore {
    * These are all the helper methods used by this class and web3 providers.
    */
 
-  /** Setup all event listeners here
-   * Each subClass must implement this method to setup event listeners
-  */
-  setupEventListeners() {
-    // setup event listeners
+  /** Add a newly used public key so that it can show up next time discover is called */
+  addToAccountToPublicKeyMap(account: string, publicKey: string) {
+    const newKey = { account, publicKey };
+    this.accountToPublicKeyCache.push(newKey);  
+  }
+
+  /** Check if the provider exists or not. If not throw */
+  assertIsConnected(reject: any): void {
+    if (!this.provider) {
+      reject('Not connected. Call connect() before using this function');
+    }
   }
 
   /** Compose a map between public keys and the accounts/permission used by each one */
-  private composeKeyToAccountMap(accounts: string[]) {
+  composeKeyToAccountMap(accounts: string[]) {
     const accountMap: DiscoveryAccount[] = accounts?.map((account, index) => {
       const publicKey = this.accountToPublicKeyCache.find(
         a => a.account === account
@@ -372,28 +384,40 @@ abstract class EosTransitWeb3ProviderCore {
     return { accountMap, keys };
   }
 
-  /** Check if the provider exists or not. If not throw */
-  private assertIsConnected(reject: any): void {
-    if (!this.provider) {
-      reject('Not connected. Call connect() before using this function');
+  /** Web3 provider doesn't support discovering keys from the wallet. */
+  async getAvailableKeys(): Promise<string[]> {
+    return new Promise((resolve, reject) => {
+      reject(`${this.pluginMetaData.id}: getAvailableKeys is not supported`);
+    });
+  }
+
+  /** Get the current wallet provider metaData
+   * Each plugin must implement this method for getting the current provider details
+  */
+  getCurrentWalletProvider(): void {
+    const walletProvider = this.getCurrentWalletProviderName();
+    this.pluginMetaData.walletMetadata = {
+      ...this.pluginMetaData.walletMetadata,
+      id: walletProvider,
+      name: walletProvider,
+      shortName: walletProvider,
     }
   }
 
+  /** Get the current wallet provider name - each plugin must implement this method */
+  getCurrentWalletProviderName(): string {
+    return 'unspecified';
+  }
+
   /** Extract a public key using the transaction/message hash and signature */
-  private getPublicKeyFromSignedHash(messageHash: string, signature: string): string {
+  getPublicKeyFromSignedHash(messageHash: string, signature: string): string {
     const msgHashBytes = ethers.utils.arrayify(messageHash);
     let publicKey = ethers.utils.recoverPublicKey(msgHashBytes, signature);
     return publicKey;  
   }
 
-  /** Add a newly used public key so that it can show up next time discover is called */
-  private addToAccountToPublicKeyMap(account: string, publicKey: string) {
-    const newKey = { account, publicKey };
-    this.accountToPublicKeyCache.push(newKey);  
-  }
-
   /** Extract the raw transaction from sign response (remove unnecessary fields) */
-  private mapTransactionResponseToTransaction(transactionResponse: ethers.providers.TransactionResponse) {
+  mapTransactionResponseToTransaction(transactionResponse: providers.TransactionResponse) {
     const {
       to,
       from,
@@ -423,11 +447,11 @@ abstract class EosTransitWeb3ProviderCore {
     return transaction as ethers.Transaction;
   }
 
-  /** Web3 provider doesn't support discovering keys from the wallet. */
-  private async getAvailableKeys(): Promise<string[]> {
-    return new Promise((resolve, reject) => {
-      reject(`${this.pluginMetaData.id}: getAvailableKeys is not supported`);
-    });
+  /** Setup all event listeners here
+   * Each subClass must implement this method to setup event listeners
+  */
+  setupEventListeners() {
+    // setup event listeners
   }
 
 }
