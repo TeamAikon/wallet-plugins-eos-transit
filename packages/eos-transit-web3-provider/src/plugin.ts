@@ -3,13 +3,16 @@ import EosTransitWeb3ProviderCore, {
   DiscoveryOptions,
   DiscoverResponse,
   isAString,
+  NetworkConfig,
   PluginMetaData,
   PushTransactionArgs,
+  SignatureProvider,
   SignatureProviderArgs,
   WalletAuth,
+  WalletProvider,
   WEB3_DEFAULT_PERMISSION,
-  Web3WalletProviderOptions,
   Web3WalletProviderAdditionalOptions,
+  Web3WalletProviderOptions,
 } from './EosTransitWeb3ProviderCore';
 
 declare const window: any;
@@ -65,6 +68,42 @@ class Web3ProviderPlugin extends EosTransitWeb3ProviderCore {
     return super.sign({ serializedTransaction, requiredKeys });
   }
 
+  makeSignatureProvider(): SignatureProvider {
+    return super.makeSignatureProvider();
+  }
+
+  makeWalletProvider(network: NetworkConfig): WalletProvider {
+    return super.makeWalletProvider(network);
+  }
+
+  addToAccountToPublicKeyMap(account: string, publicKey: string) {
+    return super.addToAccountToPublicKeyMap(account, publicKey);
+  }
+
+  assertIsConnected(reject: any): void {
+    return super.assertIsConnected(reject);
+  }
+
+  composeKeyToAccountMap(accounts: string[]) {
+    return super.composeKeyToAccountMap(accounts);
+  }
+
+  async getAvailableKeys(): Promise<string[]> {
+    return super.getAvailableKeys();
+  }
+
+  getCurrentWalletProvider() {
+    return super.getCurrentWalletProvider();
+  }
+
+  getPublicKeyFromSignedHash(messageHash: string, signature: string): string {
+    return super.getPublicKeyFromSignedHash(messageHash, signature);
+  }
+
+  mapTransactionResponseToTransaction(transactionResponse: providers.TransactionResponse) {
+    return super.mapTransactionResponseToTransaction(transactionResponse);
+  }
+
   /** setup all event listeners here. We listen for events like
    *  - network change
    *  - accounts change
@@ -94,14 +133,20 @@ class Web3ProviderPlugin extends EosTransitWeb3ProviderCore {
   async popupSelectDesiredNetworkIfNeeded(requiredNetwork: any & { chainId: number | string }): Promise<void> {
     const { chainIdInt, chainIdHex } = this.getChainIdFromNetwork(requiredNetwork);
     if (this.selectedNetwork?.chainId === chainIdInt) return;
-    // propmt the user to select the correct network
-    await window?.ethereum.request({
-      method: 'wallet_switchEthereumChain',
-      params: [{ chainId: chainIdHex }]
-    });
-    this.selectedNetwork = await this.provider.getNetwork();
-    // if desired network not selected, throw
-    this.assertIsDesiredNetwork(requiredNetwork);
+
+    // not all wallets implement the wallet_switchEthereumChain method - this is optional
+    try {
+      // propmt the user to select the correct network
+      await window?.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: chainIdHex }]
+      });
+      this.selectedNetwork = await this.provider.getNetwork();
+      // if desired network not selected, throw
+      this.assertIsDesiredNetwork(requiredNetwork);
+    } catch(error) {
+      console.log('popupSelectDesiredNetworkIfNeeded::error', error);
+    }
   }
 
   /** convert network chainId to int if needed */
@@ -110,6 +155,27 @@ class Web3ProviderPlugin extends EosTransitWeb3ProviderCore {
     const chainIdInt = isAString(chainId) ? parseInt(chainId) : chainId;
     const chainIdHex = `0x${chainIdInt}`;
     return { chainIdInt, chainIdHex };
+  }
+
+  /** Get the current wallet provider name */
+  getCurrentWalletProviderName(): string {
+    let providerName: string = 'unspecified';
+
+    if (!window.web3) providerName = 'unknown';
+    if (window.web3.currentProvider.isMetaMask) providerName = 'metamask';
+    if (window.web3.currentProvider.isTrust) providerName = 'trust';
+    if (window.web3.currentProvider.isGoWallet) providerName = 'goWallet';
+    if (window.web3.currentProvider.isAlphaWallet) providerName = 'alphaWallet';
+    if (window.web3.currentProvider.isStatus) providerName = 'status';
+    if (window.web3.currentProvider.isToshi) providerName = 'coinbase';
+
+    if (typeof window.__CIPHER__ !== 'undefined') providerName = 'cipher';
+    if (window.web3.currentProvider.constructor.name === 'EthereumProvider') providerName = 'mist';
+    if (window.web3.currentProvider.constructor.name === 'Web3FrameProvider') providerName = 'parity';
+    if (window.web3.currentProvider.host && window.web3.currentProvider.host.indexOf('infura') !== -1) providerName = 'infura';
+    if (window.web3.currentProvider.host && window.web3.currentProvider.host.indexOf('localhost') !== -1) providerName = 'localhost';
+
+    return providerName;
   }
 
   /** reject if requiredNetwork is not already selected in the wallet */
@@ -137,6 +203,7 @@ const web3WalletProviderPlugin = (args: Web3WalletProviderOptions) => {
     description: args?.description || 'Use Web3 Web Wallet to sign your Ethereum transactions',
     isWalletInterface: true,
     walletMetadata: {
+      id: 'unspecified',
       name: 'unspecified',
       shortName: 'unspecified',
       description: 'unspecified'
