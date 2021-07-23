@@ -65,7 +65,11 @@ export type SignatureProviderArgs = {
   requiredKeys: string[];
 }
 
-
+export type WalletAuth = {
+  accountName: string;
+  permission: string;
+  publicKey?: string;
+}
 export interface WalletProvider {
   id?: string;
   meta?: WalletProviderMetadata;
@@ -81,12 +85,6 @@ export interface WalletProvider {
   ): Promise<WalletAuth>;
   logout(accountName?: string): Promise<boolean>;
   signArbitrary(data: string, userMessage: string): Promise<string>;
-}
-
-export type WalletAuth = {
-  accountName: string;
-  permission: string;
-  publicKey?: string;
 }
 
 export type WalletProviderMetadata = {
@@ -135,8 +133,8 @@ abstract class EosTransitWeb3ProviderCore {
   additionalOptions: Web3WalletProviderAdditionalOptions;
   discoveredAccounts: WalletAuth[] = [];
   loggedInAccount: WalletAuth | undefined;
-  pluginMetaData: PluginMetaData;
   networkConfig: NetworkConfig;
+  pluginMetaData: PluginMetaData;
   provider: providers.Web3Provider;
   selectedAccount: string | undefined;
   selectedNetwork: providers.Network | undefined;
@@ -342,11 +340,17 @@ abstract class EosTransitWeb3ProviderCore {
    * These are all the helper methods used by this class and web3 providers.
    */
 
-  /** Setup all event listeners here
-   * Each subClass must implement this method to setup event listeners
-  */
-  setupEventListeners() {
-    // setup event listeners
+  /** Add a newly used public key so that it can show up next time discover is called */
+  private addToAccountToPublicKeyMap(account: string, publicKey: string) {
+    const newKey = { account, publicKey };
+    this.accountToPublicKeyCache.push(newKey);  
+  }
+
+  /** Check if the provider exists or not. If not throw */
+  private assertIsConnected(reject: any): void {
+    if (!this.provider) {
+      reject('Not connected. Call connect() before using this function');
+    }
   }
 
   /** Compose a map between public keys and the accounts/permission used by each one */
@@ -371,11 +375,11 @@ abstract class EosTransitWeb3ProviderCore {
     return { accountMap, keys };
   }
 
-  /** Check if the provider exists or not. If not throw */
-  private assertIsConnected(reject: any): void {
-    if (!this.provider) {
-      reject('Not connected. Call connect() before using this function');
-    }
+  /** Web3 provider doesn't support discovering keys from the wallet. */
+  private async getAvailableKeys(): Promise<string[]> {
+    return new Promise((resolve, reject) => {
+      reject(`${this.pluginMetaData.id}: getAvailableKeys is not supported`);
+    });
   }
 
   /** Extract a public key using the transaction/message hash and signature */
@@ -383,12 +387,6 @@ abstract class EosTransitWeb3ProviderCore {
     const msgHashBytes = ethers.utils.arrayify(messageHash);
     let publicKey = ethers.utils.recoverPublicKey(msgHashBytes, signature);
     return publicKey;  
-  }
-
-  /** Add a newly used public key so that it can show up next time discover is called */
-  private addToAccountToPublicKeyMap(account: string, publicKey: string) {
-    const newKey = { account, publicKey };
-    this.accountToPublicKeyCache.push(newKey);  
   }
 
   /** Extract the raw transaction from sign response (remove unnecessary fields) */
@@ -422,11 +420,11 @@ abstract class EosTransitWeb3ProviderCore {
     return transaction as ethers.Transaction;
   }
 
-  /** Web3 provider doesn't support discovering keys from the wallet. */
-  private async getAvailableKeys(): Promise<string[]> {
-    return new Promise((resolve, reject) => {
-      reject(`${this.pluginMetaData.id}: getAvailableKeys is not supported`);
-    });
+  /** Setup all event listeners here
+   * Each subClass must implement this method to setup event listeners
+  */
+   setupEventListeners() {
+    // setup event listeners
   }
 
 }
