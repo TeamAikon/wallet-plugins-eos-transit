@@ -93,6 +93,7 @@ export type WalletProviderMetadata = {
   description?: string;
   isWalletInterface?: boolean;
   walletMetadata?: {
+    id?: string;
     name?: string;
     shortName?: string;
     description?: string;
