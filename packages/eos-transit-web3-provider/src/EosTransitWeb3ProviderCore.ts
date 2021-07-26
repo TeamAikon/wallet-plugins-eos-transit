@@ -377,7 +377,7 @@
      // each plugin must implement this method for handling transaction timeouts
    }
  
-   /** handle connect method timeout */
+   /** handle transaction methods timeout - signArbitrary & sign */
    async handleTransactionTimeout(reject: any) {
      // each plugin must implement this method for handling transaction timeouts
    }
