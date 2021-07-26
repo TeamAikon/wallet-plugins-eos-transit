@@ -150,7 +150,7 @@ abstract class EosTransitWeb3ProviderCore {
     this.connect = this.connect.bind(this);
     this.discover = this.discover.bind(this);
     this.getAvailableKeys = this.getAvailableKeys.bind(this);
-    this.getCurrentWalletProvider = this.getCurrentWalletProvider.bind(this);
+    this.getCurrentWalletProviderMeta = this.getCurrentWalletProviderMeta.bind(this);
     this.login = this.login.bind(this);
     this.makeSignatureProvider = this.makeSignatureProvider.bind(this);
     this.makeWalletProvider = this.makeWalletProvider.bind(this);
@@ -176,7 +176,7 @@ abstract class EosTransitWeb3ProviderCore {
         this.setupEventListeners();
 
         // get the current wallet provider meta data, ex: metamask, walletconnect, etc
-        this.getCurrentWalletProvider();
+        this.getCurrentWalletProviderMeta();
 
         // return the response
         if (this.provider) {
@@ -394,7 +394,7 @@ abstract class EosTransitWeb3ProviderCore {
   /** Get the current wallet provider metaData
    * Each plugin must implement this method for getting the current provider details
   */
-  getCurrentWalletProvider(): void {
+  getCurrentWalletProviderMeta(): void {
     const walletProvider = this.getCurrentWalletProviderName();
     this.pluginMetaData.walletMetadata = {
       ...this.pluginMetaData.walletMetadata,
