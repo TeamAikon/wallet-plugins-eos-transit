@@ -19,7 +19,8 @@ import EosTransitWeb3ProviderCore, {
 declare const window: any;
 
 // wallet connect config options
-const WALLET_CONNECT_INFURA_ID = '27e484dcd9e3efcfd25a83a78777cdf1';
+const ERROR_TIMEOUT_IN_MILLISECONDS = 30000; // timeout in ms if the user fails to connect 120000
+const WALLET_CONNECT_INFURA_ID = '4807102366a64a28b33e10d8751c9404';
 const WALLET_CONNECT_DISPLAY_QR_CODE = true;
 const WALLET_CONNECT_RPC_ENDPOINTS = {
   1: "https://mainnet.infura.io/v3/4807102366a64a28b33e10d8751c9404",
@@ -42,13 +43,17 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
   async connect(appName: string): Promise<boolean> {
     return new Promise(async (resolve, reject) => {
       try {
-
         // initialize new wallet connect web3 provider
         walletConnectProvider = new WalletConnectProvider({
           infuraId: WALLET_CONNECT_INFURA_ID, // Required
           qrcode: WALLET_CONNECT_DISPLAY_QR_CODE,
           rpc: WALLET_CONNECT_RPC_ENDPOINTS,
         });
+
+        // set timeout for user to connect to provider
+        if ( !this.provider ) {
+          this.setErrorTimeout(this.handleConnectTimeout, reject);
+        }
 
         // display the QR code for user to connect using walletConnect
         await walletConnectProvider.enable();
@@ -68,7 +73,7 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
 
   async disconnect(): Promise<boolean> {
     return new Promise(async (resolve, reject) => {
-      await walletConnectProvider.disconnect();  
+      await walletConnectProvider.disconnect();
       resolve(true);
     });
   }
@@ -80,6 +85,32 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
   async logout(accountName?: string): Promise<boolean> {
     return super.logout(accountName);
   }
+
+  /** set timeout for connect, signArbitrary and sign methods */
+  setErrorTimeout(callback: Function, reject: any): void {
+    return super.setErrorTimeout(callback, reject);
+  }
+
+  /** handle connect method timeout */
+  async handleConnectTimeout(reject: any) {
+    if ( !this.provider ) {
+      const errorMessage = `Connection timed out, Please try connecting again.`;
+      // close the connect QR code modal
+      walletConnectProvider?.qrcodeModal?.close();
+      await this.disconnect();
+      reject(errorMessage);
+    }
+  }
+
+  /** handle connect method timeout */
+  async handleTransactionTimeout(reject: any) {
+    if ( !this.provider || this.isTransactionRequestPending ) {
+      const errorMessage = `Transaction timed out, Please try executing the transaction again.`;
+      await this.disconnect();
+      reject(errorMessage);
+    }
+  }
+  
 
   async signArbitrary(data: string, userMessage: string): Promise<string> {
     return super.signArbitrary(data, userMessage);
@@ -113,8 +144,8 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
     return super.getAvailableKeys();
   }
 
-  getCurrentWalletProvider() {
-    return super.getCurrentWalletProvider();
+  getCurrentWalletProviderMeta() {
+    return super.getCurrentWalletProviderMeta();
   }
 
   getPublicKeyFromSignedHash(messageHash: string, signature: string): string {
@@ -199,7 +230,7 @@ const walletConnectProviderPlugin = (args: Web3WalletProviderOptions) => {
 
   // additional optional args that might be passed while initializing the plugin
   const additionalOptions: Web3WalletProviderAdditionalOptions = {
-    errorTimeout: args?.errorTimeout,
+    errorTimeout: args?.errorTimeout || ERROR_TIMEOUT_IN_MILLISECONDS,
     network: args?.network,
   }
 
