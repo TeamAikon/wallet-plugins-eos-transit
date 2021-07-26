@@ -19,7 +19,7 @@ import EosTransitWeb3ProviderCore, {
 declare const window: any;
 
 // wallet connect config options
-const ERROR_TIMEOUT_IN_MILLISECONDS = 30000; // timeout in ms if the user fails to connect 120000
+const ERROR_TIMEOUT_IN_MILLISECONDS = 120000; // timeout in ms if the user fails to connect
 const WALLET_CONNECT_INFURA_ID = '4807102366a64a28b33e10d8751c9404';
 const WALLET_CONNECT_DISPLAY_QR_CODE = true;
 const WALLET_CONNECT_RPC_ENDPOINTS = {
