@@ -18,7 +18,7 @@ import EosTransitWeb3ProviderCore, {
 declare const window: any;
 
 // web3 config options
-const ERROR_TIMEOUT_IN_MILLISECONDS = 120000; // timeout in ms if the user fails to connect
+const ERROR_TIMEOUT_IN_MILLISECONDS = 10000; // timeout in ms if the user fails to connect
 
 class Web3ProviderPlugin extends EosTransitWeb3ProviderCore {
 
@@ -37,6 +37,7 @@ class Web3ProviderPlugin extends EosTransitWeb3ProviderCore {
       try {
         await window?.ethereum?.enable();
         const res = await super.connect(appName, window.ethereum);
+        console.log('this.provider', this.provider)
 
         // check if current selected network matches requested network, if not display network chenage popup
         await this.popupSelectDesiredNetworkIfNeeded(this.networkConfig);
@@ -61,6 +62,23 @@ class Web3ProviderPlugin extends EosTransitWeb3ProviderCore {
 
   async logout(accountName?: string): Promise<boolean> {
     return super.logout(accountName);
+  }
+
+  /** set timeout for connect, signArbitrary and sign methods
+   * NOTE: Error timeout is not supported by MetaMask and other web3 providers
+  */
+  setErrorTimeout(callback: Function, reject: any): void {
+    return super.setErrorTimeout(callback, reject);
+  }
+
+  /** handle connect method timeout */
+  async handleConnectTimeout(reject: any) {
+    return super.handleConnectTimeout(reject);
+  }
+
+  /** handle transaction methods timeout - signArbitrary & sign */
+  async handleTransactionTimeout(reject: any) {
+    return super.handleTransactionTimeout(reject);
   }
 
   async signArbitrary(data: string, userMessage: string): Promise<string> {
