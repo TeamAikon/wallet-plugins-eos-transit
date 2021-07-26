@@ -102,7 +102,7 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
     }
   }
 
-  /** handle connect method timeout */
+  /** handle transaction methods timeout - signArbitrary & sign */
   async handleTransactionTimeout(reject: any) {
     if ( !this.provider || this.isTransactionRequestPending ) {
       const errorMessage = `Transaction timed out, Please try executing the transaction again.`;
