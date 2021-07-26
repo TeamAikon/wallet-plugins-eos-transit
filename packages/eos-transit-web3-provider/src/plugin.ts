@@ -17,6 +17,9 @@ import EosTransitWeb3ProviderCore, {
 
 declare const window: any;
 
+// web3 config options
+const ERROR_TIMEOUT_IN_MILLISECONDS = 120000; // timeout in ms if the user fails to connect
+
 class Web3ProviderPlugin extends EosTransitWeb3ProviderCore {
 
   constructor(pluginMetaData: PluginMetaData, additionalOptions: Web3WalletProviderAdditionalOptions) {
@@ -92,8 +95,8 @@ class Web3ProviderPlugin extends EosTransitWeb3ProviderCore {
     return super.getAvailableKeys();
   }
 
-  getCurrentWalletProvider() {
-    return super.getCurrentWalletProvider();
+  getCurrentWalletProviderMeta() {
+    return super.getCurrentWalletProviderMeta();
   }
 
   getPublicKeyFromSignedHash(messageHash: string, signature: string): string {
@@ -212,7 +215,7 @@ const web3WalletProviderPlugin = (args: Web3WalletProviderOptions) => {
 
   // additional optional args that might be passed while initializing the plugin
   const additionalOptions: Web3WalletProviderAdditionalOptions = {
-    errorTimeout: args?.errorTimeout,
+    errorTimeout: args?.errorTimeout || ERROR_TIMEOUT_IN_MILLISECONDS,
     network: args?.network,
   }
 
