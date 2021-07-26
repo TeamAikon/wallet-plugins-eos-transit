@@ -137,6 +137,7 @@ abstract class EosTransitWeb3ProviderCore {
   networkConfig: NetworkConfig;
   pluginMetaData: PluginMetaData;
   provider: providers.Web3Provider;
+  isTransactionRequestPending: boolean; // this will track status of transaction requests
   selectedAccount: string | undefined;
   selectedNetwork: providers.Network | undefined;
   signer: Signer;
@@ -151,9 +152,12 @@ abstract class EosTransitWeb3ProviderCore {
     this.discover = this.discover.bind(this);
     this.getAvailableKeys = this.getAvailableKeys.bind(this);
     this.getCurrentWalletProviderMeta = this.getCurrentWalletProviderMeta.bind(this);
+    this.handleConnectTimeout = this.handleConnectTimeout.bind(this);
+    this.handleTransactionTimeout = this.handleTransactionTimeout.bind(this);
     this.login = this.login.bind(this);
     this.makeSignatureProvider = this.makeSignatureProvider.bind(this);
     this.makeWalletProvider = this.makeWalletProvider.bind(this);
+    this.setErrorTimeout = this.setErrorTimeout.bind(this);
     this.setupEventListeners = this.setupEventListeners.bind(this);
     this.sign = this.sign.bind(this);
     this.signArbitrary = this.signArbitrary.bind(this);
@@ -266,15 +270,22 @@ abstract class EosTransitWeb3ProviderCore {
   */
   async signArbitrary(data: string, userMessage: string): Promise<string> {
     return new Promise(async (resolve, reject) => {
-      this.assertIsConnected(reject);
       try {
+        this.assertIsConnected(reject);
+        this.isTransactionRequestPending = true;
+
+        // set error timeout
+        this.setErrorTimeout(this.handleTransactionTimeout, reject);
+
         const signature = await this.signer.signMessage(data);
         const dataHash = ethers.utils.hashMessage(data);
         const address = ethers.utils.verifyMessage(data, signature);
         const publicKey = this.getPublicKeyFromSignedHash(dataHash, signature);
         this.addToAccountToPublicKeyMap(address, publicKey);
+        this.isTransactionRequestPending = false;
         resolve(signature);
       } catch (err) {
+        this.isTransactionRequestPending = false;
         reject(err);
       }
     });
@@ -285,6 +296,11 @@ abstract class EosTransitWeb3ProviderCore {
     return new Promise(async (resolve, reject) => {
       try {
         this.assertIsConnected(reject);
+        this.isTransactionRequestPending = true;
+
+        // set error timeout
+        this.setErrorTimeout(this.handleTransactionTimeout, reject);
+
         const decodedTransaction: any = decode(serializedTransaction);
         let signedTransaction: ethers.providers.TransactionResponse;
         // if the decoded transaction contains a contract, execute specified function in the contract
@@ -309,11 +325,13 @@ abstract class EosTransitWeb3ProviderCore {
         const msgHash = ethers.utils.keccak256(raw);
         const publicKey = this.getPublicKeyFromSignedHash(msgHash, signature);
         this.addToAccountToPublicKeyMap(from as string, publicKey);
+        this.isTransactionRequestPending = false;
         resolve({
           signatures: signature ? [signature] : [],
           serializedTransaction: encode(raw)
         });
       } catch (error) {
+        this.isTransactionRequestPending = false;
         reject(error);
       }
     });
@@ -344,6 +362,26 @@ abstract class EosTransitWeb3ProviderCore {
       signArbitrary: this.signArbitrary
     }
   }
+
+  /** set timeout for connect, signArbitrary and sign methods */
+  setErrorTimeout(callback: Function, reject: any): void {
+    const { errorTimeout } = this.additionalOptions;
+    // set the timeout
+    setTimeout( () => {
+      callback(reject);
+    }, errorTimeout);
+  }
+
+  /** handle connect method timeout */
+  async handleConnectTimeout(reject: any) {
+    // each plugin must implement this method for handling transaction timeouts
+  }
+
+  /** handle connect method timeout */
+  async handleTransactionTimeout(reject: any) {
+    // each plugin must implement this method for handling transaction timeouts
+  }
+  
 
   /** Helper Methods
    * These are all the helper methods used by this class and web3 providers.
