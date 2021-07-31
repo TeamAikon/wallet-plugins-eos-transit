@@ -41,8 +41,6 @@ class Web3ProviderPlugin extends EosTransitWeb3ProviderCore {
       try {
         await window?.ethereum?.enable();
         const res = await super.connect(appName, window.ethereum);
-        console.log('this.provider', this.provider);
-
         // check if current selected network matches requested network, if not display network chenage popup
         await this.popupSelectDesiredNetworkIfNeeded(this.networkConfig);
         resolve(res);
