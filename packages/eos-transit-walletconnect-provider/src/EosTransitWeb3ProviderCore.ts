@@ -19,11 +19,10 @@ export type DiscoveryAccount = {
     account: string;
     authorization: string;
   }[];
-}
+};
 
 /** no discover options needed for Web3 */
-export type DiscoveryOptions = {
-}
+export type DiscoveryOptions = {};
 
 export type DiscoverResponse = {
   keyToAccountMap: DiscoveryAccount[];
@@ -31,11 +30,11 @@ export type DiscoverResponse = {
     index: number;
     key: string | undefined;
   }[];
-}
+};
 
 export enum EthereumNetworkType {
   EthMain = 'eth_main',
-  EthRopsten = 'eth_ropsten',
+  EthRopsten = 'eth_ropsten'
 }
 
 export type NetworkConfig = {
@@ -44,37 +43,40 @@ export type NetworkConfig = {
   host: string;
   port?: number;
   chainId: string;
-}
+};
 
-export type PluginMetaData = WalletProviderMetadata & { id: string; }
+export type PluginMetaData = WalletProviderMetadata & { id: string };
 
 export type PushTransactionArgs = {
   signatures: string[];
   serializedTransaction: Uint8Array;
-}
+};
 
 export type SignatureProvider = {
   /** Public keys associated with the private keys that the `SignatureProvider` holds */
   getAvailableKeys: () => Promise<string[]>;
   /** Sign a transaction */
   sign: (args: SignatureProviderArgs) => Promise<PushTransactionArgs>;
-}
+};
 
 export type SignatureProviderArgs = {
   serializedTransaction: Uint8Array;
   requiredKeys: string[];
-}
+};
 
 export type WalletAuth = {
   accountName: string;
   permission: string;
   publicKey?: string;
-}
+};
 export interface WalletProvider {
   id?: string;
   meta?: WalletProviderMetadata;
   signatureProvider: SignatureProvider;
-  connect(appName: string, web3Provider?: providers.ExternalProvider): Promise<boolean>;
+  connect(
+    appName: string,
+    web3Provider?: providers.ExternalProvider
+  ): Promise<boolean>;
   discover(discoveryOptions: DiscoveryOptions): Promise<DiscoverResponse>;
   disconnect(): Promise<boolean>;
   login(
@@ -97,8 +99,8 @@ export type WalletProviderMetadata = {
     name?: string;
     shortName?: string;
     description?: string;
-  }
-}
+  };
+};
 
 export type Web3WalletProviderOptions = {
   id: string;
@@ -107,23 +109,22 @@ export type Web3WalletProviderOptions = {
   description?: string;
   errorTimeout?: number;
   network?: EthereumNetworkType;
-}
+};
 
 export type Web3WalletProviderAdditionalOptions = {
   errorTimeout?: number;
   network?: EthereumNetworkType;
-}
+};
 
 /** Export all helper functions */
 
 /** Check if the given value is a string or instance of string */
 export function isAString(value: any): boolean {
-  if (!value) return false
-  return typeof value === 'string' || value instanceof String
+  if (!value) return false;
+  return typeof value === 'string' || value instanceof String;
 }
 
 export const WEB3_DEFAULT_PERMISSION = 'active';
-
 
 /**
  * This is an Abstract class which implements most of Eos Transit Web3 Provider functionalities
@@ -141,8 +142,11 @@ abstract class EosTransitWeb3ProviderCore {
   selectedAccount: string | undefined;
   selectedNetwork: providers.Network | undefined;
   signer: Signer;
-  
-  constructor(pluginMetaData: PluginMetaData, additionalOptions: Web3WalletProviderAdditionalOptions) {
+
+  constructor(
+    pluginMetaData: PluginMetaData,
+    additionalOptions: Web3WalletProviderAdditionalOptions
+  ) {
     this.pluginMetaData = pluginMetaData;
     this.additionalOptions = additionalOptions;
 
@@ -151,7 +155,9 @@ abstract class EosTransitWeb3ProviderCore {
     this.connect = this.connect.bind(this);
     this.discover = this.discover.bind(this);
     this.getAvailableKeys = this.getAvailableKeys.bind(this);
-    this.getCurrentWalletProviderMeta = this.getCurrentWalletProviderMeta.bind(this);
+    this.getCurrentWalletProviderMeta = this.getCurrentWalletProviderMeta.bind(
+      this
+    );
     this.handleConnectTimeout = this.handleConnectTimeout.bind(this);
     this.handleTransactionTimeout = this.handleTransactionTimeout.bind(this);
     this.login = this.login.bind(this);
@@ -164,11 +170,17 @@ abstract class EosTransitWeb3ProviderCore {
   }
 
   /** Connect with the given provider and return boolen response. */
-  connect(appName: string, externalProvider: providers.ExternalProvider): Promise<boolean> {
+  connect(
+    appName: string,
+    externalProvider: providers.ExternalProvider
+  ): Promise<boolean> {
     return new Promise(async (resolve, reject) => {
       try {
         // create a new instance of ethers js using web3 provider
-        this.provider = new ethers.providers.Web3Provider(externalProvider, 'any');
+        this.provider = new ethers.providers.Web3Provider(
+          externalProvider,
+          'any'
+        );
 
         // set the signer
         this.signer = this.provider.getSigner(); // get the signer from provider
@@ -198,7 +210,9 @@ abstract class EosTransitWeb3ProviderCore {
    * This method returns a list of all the accounts reported by the wallet
    * For web3 providers, it can't get the publicKey from the wallet so we don't return it here
    */
-  async discover(discoveryOptions?: DiscoveryOptions): Promise<DiscoverResponse> {
+  async discover(
+    discoveryOptions?: DiscoveryOptions
+  ): Promise<DiscoverResponse> {
     return new Promise(async (resolve, reject) => {
       try {
         const accounts = await this.provider.listAccounts();
@@ -225,13 +239,18 @@ abstract class EosTransitWeb3ProviderCore {
   }
 
   /** Login is not required for web3 provider, connecting to wallet can be considered as login */
-  async login(accountName?: string, authorization: string = WEB3_DEFAULT_PERMISSION): Promise<WalletAuth> {
+  async login(
+    accountName?: string,
+    authorization: string = WEB3_DEFAULT_PERMISSION
+  ): Promise<WalletAuth> {
     return new Promise<WalletAuth>(async (resolve, reject) => {
       this.assertIsConnected(reject);
       try {
         await this.discover();
         if (accountName) {
-          const account = this.discoveredAccounts.find(a => accountName === a.accountName);
+          const account = this.discoveredAccounts.find(
+            a => accountName === a.accountName
+          );
           if (!account) {
             reject(
               `Account ${accountName} not found in wallet - can't login with it`
@@ -292,7 +311,9 @@ abstract class EosTransitWeb3ProviderCore {
   }
 
   /** Signs the provided transaction */
-  async sign({ serializedTransaction }: SignatureProviderArgs): Promise<PushTransactionArgs> {
+  async sign({
+    serializedTransaction
+  }: SignatureProviderArgs): Promise<PushTransactionArgs> {
     return new Promise(async (resolve, reject) => {
       try {
         this.assertIsConnected(reject);
@@ -316,11 +337,24 @@ abstract class EosTransitWeb3ProviderCore {
             decodedContract.method
           ](...decodedContract.parameters);
         } else {
-          signedTransaction = await this.signer.sendTransaction(decodedTransaction);
+          signedTransaction = await this.signer.sendTransaction(
+            decodedTransaction
+          );
         }
         // extract and return signed transaction and signature
-        const { hash, from, r, s, v, ...transaction } = this.mapTransactionResponseToTransaction(signedTransaction);
-        const signature = ethers.utils.joinSignature({ r, s, v } as {r:string, s:string, v:number});
+        const {
+          hash,
+          from,
+          r,
+          s,
+          v,
+          ...transaction
+        } = this.mapTransactionResponseToTransaction(signedTransaction);
+        const signature = ethers.utils.joinSignature({ r, s, v } as {
+          r: string;
+          s: string;
+          v: number;
+        });
         const raw = ethers.utils.serializeTransaction(transaction);
         const msgHash = ethers.utils.keccak256(raw);
         const publicKey = this.getPublicKeyFromSignedHash(msgHash, signature);
@@ -341,8 +375,8 @@ abstract class EosTransitWeb3ProviderCore {
   makeSignatureProvider(): SignatureProvider {
     return {
       sign: this.sign,
-      getAvailableKeys: this.getAvailableKeys,
-    }
+      getAvailableKeys: this.getAvailableKeys
+    };
   }
 
   /** This methods implements the Eos Transit plugin interface */
@@ -352,7 +386,7 @@ abstract class EosTransitWeb3ProviderCore {
 
     return {
       id: this.pluginMetaData.id,
-      meta: (walletMetaData as WalletProviderMetadata),
+      meta: walletMetaData as WalletProviderMetadata,
       signatureProvider: this.makeSignatureProvider(),
       connect: this.connect,
       discover: this.discover,
@@ -360,14 +394,14 @@ abstract class EosTransitWeb3ProviderCore {
       login: this.login,
       logout: this.logout,
       signArbitrary: this.signArbitrary
-    }
+    };
   }
 
   /** set timeout for connect, signArbitrary and sign methods */
   setErrorTimeout(callback: Function, reject: any): void {
     const { errorTimeout } = this.additionalOptions;
     // set the timeout
-    setTimeout( () => {
+    setTimeout(() => {
       callback(reject);
     }, errorTimeout);
   }
@@ -381,7 +415,6 @@ abstract class EosTransitWeb3ProviderCore {
   async handleTransactionTimeout(reject: any) {
     // each plugin must implement this method for handling transaction timeouts
   }
-  
 
   /** Helper Methods
    * These are all the helper methods used by this class and web3 providers.
@@ -390,7 +423,7 @@ abstract class EosTransitWeb3ProviderCore {
   /** Add a newly used public key so that it can show up next time discover is called */
   addToAccountToPublicKeyMap(account: string, publicKey: string) {
     const newKey = { account, publicKey };
-    this.accountToPublicKeyCache.push(newKey);  
+    this.accountToPublicKeyCache.push(newKey);
   }
 
   /** Check if the provider exists or not. If not throw */
@@ -431,15 +464,15 @@ abstract class EosTransitWeb3ProviderCore {
 
   /** Get the current wallet provider metaData
    * Each plugin must implement this method for getting the current provider details
-  */
+   */
   getCurrentWalletProviderMeta(): void {
     const walletProvider = this.getCurrentWalletProviderName();
     this.pluginMetaData.walletMetadata = {
       ...this.pluginMetaData.walletMetadata,
       id: walletProvider,
       name: walletProvider,
-      shortName: walletProvider,
-    }
+      shortName: walletProvider
+    };
   }
 
   /** Get the current wallet provider name - each plugin must implement this method */
@@ -451,11 +484,13 @@ abstract class EosTransitWeb3ProviderCore {
   getPublicKeyFromSignedHash(messageHash: string, signature: string): string {
     const msgHashBytes = ethers.utils.arrayify(messageHash);
     let publicKey = ethers.utils.recoverPublicKey(msgHashBytes, signature);
-    return publicKey;  
+    return publicKey;
   }
 
   /** Extract the raw transaction from sign response (remove unnecessary fields) */
-  mapTransactionResponseToTransaction(transactionResponse: providers.TransactionResponse) {
+  mapTransactionResponseToTransaction(
+    transactionResponse: providers.TransactionResponse
+  ) {
     const {
       to,
       from,
@@ -487,11 +522,10 @@ abstract class EosTransitWeb3ProviderCore {
 
   /** Setup all event listeners here
    * Each subClass must implement this method to setup event listeners
-  */
+   */
   setupEventListeners() {
     // setup event listeners
   }
-
 }
 
 export default EosTransitWeb3ProviderCore;

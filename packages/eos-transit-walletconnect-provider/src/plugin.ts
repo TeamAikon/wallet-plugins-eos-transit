@@ -1,5 +1,5 @@
 import { providers } from 'ethers';
-import WalletConnectProvider from "@walletconnect/web3-provider";
+import WalletConnectProvider from '@walletconnect/web3-provider';
 import EosTransitWeb3ProviderCore, {
   DiscoveryOptions,
   DiscoverResponse,
@@ -13,7 +13,7 @@ import EosTransitWeb3ProviderCore, {
   WalletProvider,
   WEB3_DEFAULT_PERMISSION,
   Web3WalletProviderAdditionalOptions,
-  Web3WalletProviderOptions,
+  Web3WalletProviderOptions
 } from './EosTransitWeb3ProviderCore';
 
 declare const window: any;
@@ -23,15 +23,17 @@ const ERROR_TIMEOUT_IN_MILLISECONDS = 120000; // timeout in ms if the user fails
 const WALLET_CONNECT_INFURA_ID = '4807102366a64a28b33e10d8751c9404';
 const WALLET_CONNECT_DISPLAY_QR_CODE = true;
 const WALLET_CONNECT_RPC_ENDPOINTS = {
-  1: "https://mainnet.infura.io/v3/4807102366a64a28b33e10d8751c9404",
-  3: "https://ropsten.infura.io/v3/4807102366a64a28b33e10d8751c9404",
+  1: 'https://mainnet.infura.io/v3/4807102366a64a28b33e10d8751c9404',
+  3: 'https://ropsten.infura.io/v3/4807102366a64a28b33e10d8751c9404'
 };
 
 let walletConnectProvider: WalletConnectProvider;
 
 class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
-
-  constructor(pluginMetaData: PluginMetaData, additionalOptions: Web3WalletProviderAdditionalOptions) {
+  constructor(
+    pluginMetaData: PluginMetaData,
+    additionalOptions: Web3WalletProviderAdditionalOptions
+  ) {
     super(pluginMetaData, additionalOptions);
 
     this.assertIsDesiredNetwork = this.assertIsDesiredNetwork.bind(this);
@@ -47,11 +49,11 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
         walletConnectProvider = new WalletConnectProvider({
           infuraId: WALLET_CONNECT_INFURA_ID, // Required
           qrcode: WALLET_CONNECT_DISPLAY_QR_CODE,
-          rpc: WALLET_CONNECT_RPC_ENDPOINTS,
+          rpc: WALLET_CONNECT_RPC_ENDPOINTS
         });
 
         // set timeout for user to connect to provider
-        if ( !this.provider ) {
+        if (!this.provider) {
           this.setErrorTimeout(this.handleConnectTimeout, reject);
         }
 
@@ -67,7 +69,9 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
     });
   }
 
-  async discover(discoveryOptions?: DiscoveryOptions): Promise<DiscoverResponse> {
+  async discover(
+    discoveryOptions?: DiscoveryOptions
+  ): Promise<DiscoverResponse> {
     return super.discover(discoveryOptions);
   }
 
@@ -78,7 +82,10 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
     });
   }
 
-  async login(accountName?: string, authorization: string = WEB3_DEFAULT_PERMISSION): Promise<WalletAuth> {
+  async login(
+    accountName?: string,
+    authorization: string = WEB3_DEFAULT_PERMISSION
+  ): Promise<WalletAuth> {
     return super.login(accountName, authorization);
   }
 
@@ -93,7 +100,7 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
 
   /** handle connect method timeout */
   async handleConnectTimeout(reject: any) {
-    if ( !this.provider ) {
+    if (!this.provider) {
       const errorMessage = `Connection timed out, Please try connecting again.`;
       // close the connect QR code modal
       walletConnectProvider?.qrcodeModal?.close();
@@ -104,19 +111,21 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
 
   /** handle transaction methods timeout - signArbitrary & sign */
   async handleTransactionTimeout(reject: any) {
-    if ( !this.provider || this.isTransactionRequestPending ) {
+    if (!this.provider || this.isTransactionRequestPending) {
       const errorMessage = `Transaction timed out, Please try executing the transaction again.`;
       await this.disconnect();
       reject(errorMessage);
     }
   }
-  
 
   async signArbitrary(data: string, userMessage: string): Promise<string> {
     return super.signArbitrary(data, userMessage);
   }
 
-  async sign({ serializedTransaction, requiredKeys }: SignatureProviderArgs): Promise<PushTransactionArgs> {
+  async sign({
+    serializedTransaction,
+    requiredKeys
+  }: SignatureProviderArgs): Promise<PushTransactionArgs> {
     return super.sign({ serializedTransaction, requiredKeys });
   }
 
@@ -152,7 +161,9 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
     return super.getPublicKeyFromSignedHash(messageHash, signature);
   }
 
-  mapTransactionResponseToTransaction(transactionResponse: providers.TransactionResponse) {
+  mapTransactionResponseToTransaction(
+    transactionResponse: providers.TransactionResponse
+  ) {
     return super.mapTransactionResponseToTransaction(transactionResponse);
   }
 
@@ -166,15 +177,18 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
   }
 
   /** Handle network change event */
-  handleOnSelectNetwork(network: providers.Network, oldNetwork: providers.Network): void {
-  }
+  handleOnSelectNetwork(
+    network: providers.Network,
+    oldNetwork: providers.Network
+  ): void {}
 
   /** Handle account change event */
-  handleOnSelectAccount(accounts: string[]) {
-  }
+  handleOnSelectAccount(accounts: string[]) {}
 
   /** convert network chainId to int if needed */
-  getChainIdFromNetwork(network: any & { chainId: number | string }): { chainIdInt: number; chainIdHex: string } {
+  getChainIdFromNetwork(
+    network: any & { chainId: number | string }
+  ): { chainIdInt: number; chainIdHex: string } {
     const { chainId } = network;
     const chainIdInt = isAString(chainId) ? parseInt(chainId) : chainId;
     const chainIdHex = `0x${chainIdInt}`;
@@ -197,7 +211,9 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
   }
 
   /** reject if requiredNetwork is not already selected in the wallet */
-  assertIsDesiredNetwork(requiredNetwork: any & { chainId: number | string }): void {
+  assertIsDesiredNetwork(
+    requiredNetwork: any & { chainId: number | string }
+  ): void {
     const { chainIdInt } = this.getChainIdFromNetwork(requiredNetwork);
     if (this.selectedNetwork?.chainId !== chainIdInt) {
       const errMsg = `Desired network not selected in wallet: Please select the it using the Wallet. Specified Network: ${JSON.stringify(
@@ -206,35 +222,37 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
       throw new Error(errMsg);
     }
   }
-
 }
-
 
 // initialize the class and return it
 const walletConnectProviderPlugin = (args: Web3WalletProviderOptions) => {
-
   // plugin meta data
   const pluginMetaData: PluginMetaData = {
     id: args?.id || 'walletconnect',
     name: args?.name || 'WalletConnect Wallet',
     shortName: args?.shortName || 'WalletConnect',
-    description: args?.description || 'Use WalletConnect Wallet to sign your Ethereum transactions',
+    description:
+      args?.description ||
+      'Use WalletConnect Wallet to sign your Ethereum transactions',
     isWalletInterface: true,
     walletMetadata: {
       id: 'unspecified',
       name: 'unspecified',
       shortName: 'unspecified',
       description: 'unspecified'
-    },
+    }
   };
 
   // additional optional args that might be passed while initializing the plugin
   const additionalOptions: Web3WalletProviderAdditionalOptions = {
     errorTimeout: args?.errorTimeout || ERROR_TIMEOUT_IN_MILLISECONDS,
-    network: args?.network,
-  }
+    network: args?.network
+  };
 
-  const plugin = new WalletConnectProviderPlugin(pluginMetaData, additionalOptions);
+  const plugin = new WalletConnectProviderPlugin(
+    pluginMetaData,
+    additionalOptions
+  );
 
   // return the wallet provider - This implements the eos-transit plugin interface
   return plugin.makeWalletProvider;
