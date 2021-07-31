@@ -7,8 +7,10 @@
  * makeWalletProvider method implements the eos plugin interface
  ******************************************************************************************************/
 
-import { ethers, providers, Signer } from 'ethers';
+import { Bytes, ethers, providers, Signer, utils } from 'ethers';
 import { decode, encode } from '@msgpack/msgpack';
+
+let timeout: number;
 
 /** all Types used within Web3Plugin Class */
 
@@ -122,6 +124,13 @@ export type Web3WalletProviderAdditionalOptions = {
 export function isAString(value: any): boolean {
   if (!value) return false;
   return typeof value === 'string' || value instanceof String;
+}
+
+/** Checks if string is a valid hex string - optional '0x' prefix - Note: ethers.isHexString requires '0x' prefix */
+export function isHexString(value: any): Boolean {
+  if (!isAString(value)) return false;
+  const match = value.match(/^(0x|0X)?[a-fA-F0-9]+$/i);
+  return !!match;
 }
 
 export const WEB3_DEFAULT_PERMISSION = 'active';
@@ -282,31 +291,42 @@ abstract class EosTransitWeb3ProviderCore {
   }
 
   /** Sign arbitrary string using web3 provider 
-    Returns the signed prefixed-message. This MUST treat:
-    - Bytes as a binary message
-    - string as a UTF8-message
-    i.e. "0x1234" is a SIX (6) byte string, NOT 2 bytes of data  
-  */
-  async signArbitrary(data: string, userMessage: string): Promise<string> {
+     Returns the signed prefixed-message. 
+     - string is a UTF8-message (e.g. 'sign this') OR Hex string ('A0D045' or '0xA0D045')
+   */
+  async signArbitrary(
+    dataString: string,
+    userMessage: string
+  ): Promise<string> {
     return new Promise(async (resolve, reject) => {
       try {
         this.assertIsConnected(reject);
-        this.isTransactionRequestPending = true;
-
         // set error timeout
         this.setErrorTimeout(this.handleTransactionTimeout, reject);
+        this.isTransactionRequestPending = true;
+        let dataBytes: Uint8Array;
 
-        const signature = await this.signer.signMessage(data);
-        const dataHash = ethers.utils.hashMessage(data);
-        const address = ethers.utils.verifyMessage(data, signature);
+        // convert string into UInt8Array
+        if (isHexString(dataString)) {
+          dataBytes = utils.arrayify(dataString, { allowMissingPrefix: true }); // convert hex string (e.g. 'A0D045') to UInt8Array - '0x' prefix is optional
+        } else {
+          dataBytes = utils.toUtf8Bytes(dataString); // from 'any UTF8 string' to Uint8Array
+        }
+
+        const signature = await this.signer.signMessage(dataBytes);
+        const dataHash = ethers.utils.hashMessage(dataBytes);
+        const address = ethers.utils.verifyMessage(dataBytes, signature);
         const publicKey = this.getPublicKeyFromSignedHash(dataHash, signature);
         this.addToAccountToPublicKeyMap(address, publicKey);
         this.isTransactionRequestPending = false;
+        this.clearErrorTimeout();
         resolve(signature);
       } catch (err) {
         this.isTransactionRequestPending = false;
+        this.clearErrorTimeout();
         reject(err);
       }
+      this.clearErrorTimeout();
     });
   }
 
@@ -360,14 +380,17 @@ abstract class EosTransitWeb3ProviderCore {
         const publicKey = this.getPublicKeyFromSignedHash(msgHash, signature);
         this.addToAccountToPublicKeyMap(from as string, publicKey);
         this.isTransactionRequestPending = false;
+        this.clearErrorTimeout();
         resolve({
           signatures: signature ? [signature] : [],
           serializedTransaction: encode(raw)
         });
       } catch (error) {
         this.isTransactionRequestPending = false;
+        this.clearErrorTimeout();
         reject(error);
       }
+      this.clearErrorTimeout();
     });
   }
 
@@ -400,10 +423,16 @@ abstract class EosTransitWeb3ProviderCore {
   /** set timeout for connect, signArbitrary and sign methods */
   setErrorTimeout(callback: Function, reject: any): void {
     const { errorTimeout } = this.additionalOptions;
+    if (timeout) clearTimeout(timeout);
     // set the timeout
-    setTimeout(() => {
+    timeout = setTimeout(() => {
       callback(reject);
     }, errorTimeout);
+  }
+
+  /** reset any timeout still active */
+  clearErrorTimeout(): void {
+    if (timeout) clearTimeout(timeout);
   }
 
   /** handle connect method timeout */
