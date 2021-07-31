@@ -29,7 +29,7 @@ var config = {
         filename: 'eos-transit-web3-provider.min.js',
         path: path_1.default.resolve(__dirname, 'umd'),
         libraryTarget: 'umd',
-        library: ['WAL', 'providers', 'algosigner'],
+        library: ['WAL', 'providers', 'web3'],
         libraryExport: 'default'
     },
     plugins: [
