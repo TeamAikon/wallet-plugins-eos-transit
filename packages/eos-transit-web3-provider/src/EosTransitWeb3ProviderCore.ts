@@ -10,7 +10,7 @@
 import { Bytes, ethers, providers, Signer, utils } from 'ethers';
 import { decode, encode } from '@msgpack/msgpack';
 
-let timeout: number;
+let timeout: any;
 
 /** all Types used within Web3Plugin Class */
 

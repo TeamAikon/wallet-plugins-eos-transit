@@ -203,29 +203,36 @@ class Web3ProviderPlugin extends EosTransitWeb3ProviderCore {
   getCurrentWalletProviderName(): string {
     let providerName: string = 'unspecified';
 
-    if (!window.web3) providerName = 'unknown';
-    if (window.web3.currentProvider.isMetaMask) providerName = 'metamask';
-    if (window.web3.currentProvider.isTrust) providerName = 'trust';
-    if (window.web3.currentProvider.isGoWallet) providerName = 'goWallet';
-    if (window.web3.currentProvider.isAlphaWallet) providerName = 'alphaWallet';
-    if (window.web3.currentProvider.isStatus) providerName = 'status';
-    if (window.web3.currentProvider.isToshi) providerName = 'coinbase';
+    if (window?.web3) {
+      if (window.web3.currentProvider.isMetaMask) providerName = 'metamask';
+      if (window.web3.currentProvider.isTrust) providerName = 'trust';
+      if (window.web3.currentProvider.isGoWallet) providerName = 'goWallet';
+      if (window.web3.currentProvider.isAlphaWallet)
+        providerName = 'alphaWallet';
+      if (window.web3.currentProvider.isStatus) providerName = 'status';
+      if (window.web3.currentProvider.isToshi) providerName = 'coinbase';
+      if (window.web3.currentProvider.constructor.name === 'EthereumProvider')
+        providerName = 'mist';
+      if (window.web3.currentProvider.constructor.name === 'Web3FrameProvider')
+        providerName = 'parity';
+      if (
+        window.web3.currentProvider.host &&
+        window.web3.currentProvider.host.indexOf('infura') !== -1
+      )
+        providerName = 'infura';
+      if (
+        window.web3.currentProvider.host &&
+        window.web3.currentProvider.host.indexOf('localhost') !== -1
+      )
+        providerName = 'localhost';
+    } else {
+      providerName = 'unknown';
+    }
 
     if (typeof window.__CIPHER__ !== 'undefined') providerName = 'cipher';
-    if (window.web3.currentProvider.constructor.name === 'EthereumProvider')
-      providerName = 'mist';
-    if (window.web3.currentProvider.constructor.name === 'Web3FrameProvider')
-      providerName = 'parity';
-    if (
-      window.web3.currentProvider.host &&
-      window.web3.currentProvider.host.indexOf('infura') !== -1
-    )
-      providerName = 'infura';
-    if (
-      window.web3.currentProvider.host &&
-      window.web3.currentProvider.host.indexOf('localhost') !== -1
-    )
-      providerName = 'localhost';
+    if (window.ethereum.isCoin98 || window.coin98) {
+      providerName = 'Coin98';
+    }
 
     return providerName;
   }
