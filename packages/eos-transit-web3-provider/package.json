@@ -20,7 +20,7 @@
   "dependencies": {
     "@msgpack/msgpack": "^2.5.1",
     "ethers": "^5.4.1",
-    "hi-base32": "^0.5.0"
+    "hi-base32": "^0.5.1"
   },
   "devDependencies": {
     "@types/node": "^14.11.1",
