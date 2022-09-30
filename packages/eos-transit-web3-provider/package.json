@@ -1,6 +1,6 @@
 {
   "name": "eos-transit-web3-provider",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Web3 wallet provider",
   "license": "MIT",
   "main": "lib/index.js",
