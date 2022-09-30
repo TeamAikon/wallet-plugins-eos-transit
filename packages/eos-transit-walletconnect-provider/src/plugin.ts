@@ -1,4 +1,4 @@
-import { ethers, providers, utils } from 'ethers';
+import { providers } from 'ethers';
 import WalletConnectProvider from '@walletconnect/web3-provider';
 import EosTransitWeb3ProviderCore, {
   DiscoveryOptions,
@@ -14,7 +14,7 @@ import EosTransitWeb3ProviderCore, {
   WEB3_DEFAULT_PERMISSION,
   Web3WalletProviderAdditionalOptions,
   Web3WalletProviderOptions,
-  isHexString
+  SignArbitraryMetadataEth
 } from './EosTransitWeb3ProviderCore';
 
 declare const window: any;
@@ -119,42 +119,12 @@ class WalletConnectProviderPlugin extends EosTransitWeb3ProviderCore {
     }
   }
 
-  async signArbitrary(data: string, userMessage: string): Promise<string> {
-    return new Promise(async (resolve, reject) => {
-      try {
-        this.assertIsConnected(reject);
-        // set error timeout
-        this.setErrorTimeout(this.handleTransactionTimeout, reject);
-        this.isTransactionRequestPending = true;
-        let dataBytes: Uint8Array;
-
-        // convert string into UInt8Array
-        if (isHexString(data)) {
-          dataBytes = utils.arrayify(data, { allowMissingPrefix: true }); // convert hex string (e.g. 'A0D045') to UInt8Array - '0x' prefix is optional
-        } else {
-          dataBytes = utils.toUtf8Bytes(data); // from 'any UTF8 string' to Uint8Array
-        }
-
-        const walletAddress = await this.signer.getAddress();
-        const signature = await this.provider.send('personal_sign', [
-          dataBytes,
-          walletAddress
-        ]);
-
-        const dataHash = ethers.utils.hashMessage(dataBytes);
-        const address = ethers.utils.verifyMessage(dataBytes, signature);
-        const publicKey = this.getPublicKeyFromSignedHash(dataHash, signature);
-        this.addToAccountToPublicKeyMap(address, publicKey);
-        this.isTransactionRequestPending = false;
-        this.clearErrorTimeout();
-        resolve(signature);
-      } catch (err) {
-        this.isTransactionRequestPending = false;
-        this.clearErrorTimeout();
-        reject(err);
-      }
-      this.clearErrorTimeout();
-    });
+  async signArbitrary(
+    data: string,
+    userMessage: string,
+    metadata?: SignArbitraryMetadataEth
+  ): Promise<string> {
+    return super.signArbitrary(data, userMessage, metadata);
   }
 
   async sign({
