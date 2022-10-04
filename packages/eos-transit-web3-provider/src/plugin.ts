@@ -12,7 +12,8 @@ import EosTransitWeb3ProviderCore, {
   WalletProvider,
   WEB3_DEFAULT_PERMISSION,
   Web3WalletProviderAdditionalOptions,
-  Web3WalletProviderOptions
+  Web3WalletProviderOptions,
+  SignArbitraryMetadataEth
 } from './EosTransitWeb3ProviderCore';
 
 declare const window: any;
@@ -88,8 +89,12 @@ class Web3ProviderPlugin extends EosTransitWeb3ProviderCore {
     return super.handleTransactionTimeout(reject);
   }
 
-  async signArbitrary(data: string, userMessage: string): Promise<string> {
-    return super.signArbitrary(data, userMessage);
+  async signArbitrary(
+    data: string,
+    userMessage: string,
+    metadata?: SignArbitraryMetadataEth
+  ): Promise<string> {
+    return super.signArbitrary(data, userMessage, metadata);
   }
 
   async sign({

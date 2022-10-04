@@ -7,7 +7,7 @@
  * makeWalletProvider method implements the eos plugin interface
  ******************************************************************************************************/
 
-import { Bytes, ethers, providers, Signer, utils } from 'ethers';
+import { ethers, providers, Signer, utils } from 'ethers';
 import { decode, encode } from '@msgpack/msgpack';
 
 let timeout: any;
@@ -88,7 +88,11 @@ export interface WalletProvider {
     key?: string
   ): Promise<WalletAuth>;
   logout(accountName?: string): Promise<boolean>;
-  signArbitrary(data: string, userMessage: string): Promise<string>;
+  signArbitrary(
+    data: string,
+    userMessage: string,
+    metadata?: SignArbitraryMetadataEth
+  ): Promise<string>;
 }
 
 export type WalletProviderMetadata = {
@@ -118,6 +122,17 @@ export type Web3WalletProviderAdditionalOptions = {
   network?: EthereumNetworkType;
 };
 
+export enum SignArbitraryMethodEth {
+  PersonalSign = 'personal_sign',
+  EthSign = 'eth_sign',
+  EthSignTypedData = 'eth_signTypedData'
+}
+
+export type SignArbitraryMetadataEth = {
+  method: SignArbitraryMethodEth;
+  signTypedData?: { domain: object; types: object; value: object };
+};
+
 /** Export all helper functions */
 
 /** Check if the given value is a string or instance of string */
@@ -131,6 +146,34 @@ export function isHexString(value: any): Boolean {
   if (!isAString(value)) return false;
   const match = value.match(/^(0x|0X)?[a-fA-F0-9]+$/i);
   return !!match;
+}
+
+/**
+ * Typescript Typeguard helper to ensure that a string value can be assigned to an Enum type
+ * If a value can't be matched to a valid option in the enum, returns null
+ */
+export function toEnumValue<T>(enumType: T, value: any): T[keyof T] {
+  if (!value) return null as any;
+  if ((<any>Object).values(enumType).includes(value as T[keyof T])) {
+    return value;
+  }
+  return null as any;
+}
+
+/**
+ * Converts string into UInt8Array
+ */
+export function convertStringToUInt8Array(dataString: string) {
+  let dataBytes: Uint8Array;
+
+  if (isHexString(dataString)) {
+    dataBytes = utils.arrayify(dataString, {
+      allowMissingPrefix: true
+    }); // convert hex string (e.g. 'A0D045') to UInt8Array - '0x' prefix is optional
+  } else {
+    dataBytes = utils.toUtf8Bytes(dataString); // from 'any UTF8 string' to Uint8Array
+  }
+  return dataBytes;
 }
 
 export const WEB3_DEFAULT_PERMISSION = 'active';
@@ -290,13 +333,17 @@ abstract class EosTransitWeb3ProviderCore {
     });
   }
 
-  /** Sign arbitrary string using web3 provider 
-     Returns the signed prefixed-message. 
-     - string is a UTF8-message (e.g. 'sign this') OR Hex string ('A0D045' or '0xA0D045')
+  /**
+   * Sign arbitrary string using web3 provider
+   * Returns the signed prefixed-message.
+   * Supports personal_sign, eth_sign and eth_signTypedData methods
+   * - dataString is a UTF8-message (e.g. 'sign this') OR Hex string ('A0D045' or '0xA0D045')
+   * - metadata (optional) contains sign method name & optional signTypedData params
    */
   async signArbitrary(
     dataString: string,
-    userMessage: string
+    userMessage: string,
+    metadata?: SignArbitraryMetadataEth
   ): Promise<string> {
     return new Promise(async (resolve, reject) => {
       try {
@@ -304,20 +351,52 @@ abstract class EosTransitWeb3ProviderCore {
         // set error timeout
         this.setErrorTimeout(this.handleTransactionTimeout, reject);
         this.isTransactionRequestPending = true;
-        let dataBytes: Uint8Array;
+        const signMethod =
+          toEnumValue(SignArbitraryMethodEth, metadata?.method) ||
+          SignArbitraryMethodEth.PersonalSign;
+        const walletAddress = await this.signer.getAddress();
 
-        // convert string into UInt8Array
-        if (isHexString(dataString)) {
-          dataBytes = utils.arrayify(dataString, { allowMissingPrefix: true }); // convert hex string (e.g. 'A0D045') to UInt8Array - '0x' prefix is optional
-        } else {
-          dataBytes = utils.toUtf8Bytes(dataString); // from 'any UTF8 string' to Uint8Array
+        let dataHash: string;
+        let signature: string;
+        let address: string;
+        let publicKey: string;
+
+        if (signMethod === SignArbitraryMethodEth.EthSign) {
+          const dataBytes: Uint8Array = convertStringToUInt8Array(dataString);
+          dataHash = ethers.utils.hashMessage(dataBytes);
+          signature = await this.provider.send('eth_sign', [
+            walletAddress,
+            dataHash
+          ]);
+          address = ethers.utils.verifyMessage(dataBytes, signature);
+        } else if (signMethod === SignArbitraryMethodEth.EthSignTypedData) {
+          const { domain, types, value } = metadata?.signTypedData || {};
+          dataHash = ethers.utils._TypedDataEncoder.hash(
+            domain as any,
+            types as any,
+            value as any
+          );
+          signature = await this.provider
+            .getSigner()
+            ._signTypedData(domain as any, types as any, value as any);
+          address = await ethers.utils.verifyTypedData(
+            domain as any,
+            types as any,
+            value as any,
+            signature
+          );
+        }
+        // defaults to personal_sign
+        else {
+          const dataBytes: Uint8Array = convertStringToUInt8Array(dataString);
+          dataHash = ethers.utils.hashMessage(dataBytes);
+          signature = await this.signer.signMessage(dataBytes);
+          address = ethers.utils.verifyMessage(dataBytes, signature);
         }
 
-        const signature = await this.signer.signMessage(dataBytes);
-        const dataHash = ethers.utils.hashMessage(dataBytes);
-        const address = ethers.utils.verifyMessage(dataBytes, signature);
-        const publicKey = this.getPublicKeyFromSignedHash(dataHash, signature);
+        publicKey = this.getPublicKeyFromSignedHash(dataHash, signature);
         this.addToAccountToPublicKeyMap(address, publicKey);
+
         this.isTransactionRequestPending = false;
         this.clearErrorTimeout();
         resolve(signature);
@@ -326,7 +405,6 @@ abstract class EosTransitWeb3ProviderCore {
         this.clearErrorTimeout();
         reject(err);
       }
-      this.clearErrorTimeout();
     });
   }
 
