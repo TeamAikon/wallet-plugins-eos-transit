@@ -36,6 +36,8 @@ export type DiscoverResponse = {
 
 export enum EthereumNetworkType {
   EthMain = 'eth_main',
+  EthGoerli = 'eth_goerli',
+  EthRinkeby = 'eth_rinkeby',
   EthRopsten = 'eth_ropsten'
 }
 

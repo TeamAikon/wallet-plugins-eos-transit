@@ -24,8 +24,11 @@ const ERROR_TIMEOUT_IN_MILLISECONDS = 120000; // timeout in ms if the user fails
 const WALLET_CONNECT_INFURA_ID = '4807102366a64a28b33e10d8751c9404';
 const WALLET_CONNECT_DISPLAY_QR_CODE = true;
 const WALLET_CONNECT_RPC_ENDPOINTS = {
-  1: 'https://mainnet.infura.io/v3/4807102366a64a28b33e10d8751c9404',
-  3: 'https://ropsten.infura.io/v3/4807102366a64a28b33e10d8751c9404'
+  1: `https://mainnet.infura.io/v3/${WALLET_CONNECT_INFURA_ID}`,
+  3: `https://ropsten.infura.io/v3/${WALLET_CONNECT_INFURA_ID}`,
+  4: `https://rinkeby.infura.io/v3/${WALLET_CONNECT_INFURA_ID}`,
+  5: `https://goerli.infura.io/v3/${WALLET_CONNECT_INFURA_ID}`,
+  42: `https://kovan.infura.io/v3/${WALLET_CONNECT_INFURA_ID}`,
 };
 
 let walletConnectProvider: WalletConnectProvider;
