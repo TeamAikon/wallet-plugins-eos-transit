@@ -12,7 +12,8 @@ import EosTransitWeb3ProviderCore, {
   WalletProvider,
   WEB3_DEFAULT_PERMISSION,
   Web3WalletProviderAdditionalOptions,
-  Web3WalletProviderOptions
+  Web3WalletProviderOptions,
+  SignArbitraryMetadataEth
 } from './EosTransitWeb3ProviderCore';
 
 declare const window: any;
@@ -39,7 +40,7 @@ class Web3ProviderPlugin extends EosTransitWeb3ProviderCore {
   async connect(appName: string): Promise<boolean> {
     return new Promise(async (resolve, reject) => {
       try {
-        await window?.ethereum?.enable();
+        await window?.ethereum?.request({ method: 'eth_requestAccounts' });
         const res = await super.connect(appName, window.ethereum);
         // check if current selected network matches requested network, if not display network chenage popup
         await this.popupSelectDesiredNetworkIfNeeded(this.networkConfig);
@@ -88,8 +89,12 @@ class Web3ProviderPlugin extends EosTransitWeb3ProviderCore {
     return super.handleTransactionTimeout(reject);
   }
 
-  async signArbitrary(data: string, userMessage: string): Promise<string> {
-    return super.signArbitrary(data, userMessage);
+  async signArbitrary(
+    data: string,
+    userMessage: string,
+    metadata?: SignArbitraryMetadataEth
+  ): Promise<string> {
+    return super.signArbitrary(data, userMessage, metadata);
   }
 
   async sign({
